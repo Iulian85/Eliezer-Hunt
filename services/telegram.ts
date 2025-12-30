@@ -1,5 +1,3 @@
-import { createHmac } from 'crypto';
-
 interface TelegramUserData {
   id: number;
   first_name: string;
@@ -19,25 +17,63 @@ interface TelegramUserData {
   };
 }
 
-export const validateTelegramWebAppData = (initData: string, botToken: string): boolean => {
+// Helper function to create HMAC SHA256 hash using Web Crypto API
+async function createHmacSha256(key: string, message: string): Promise<string> {
+  // Create the secret key using the bot token
+  const encoder = new TextEncoder();
+  const keyBuffer = encoder.encode('WebAppData');
+  const botTokenBuffer = encoder.encode(key);
+
+  // Import the key for HMAC operations
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyBuffer,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  // Sign the bot token with the key to get the secret
+  const secretBuffer = await crypto.subtle.sign('HMAC', cryptoKey, botTokenBuffer);
+
+  // Now sign the dataCheckString with the secret
+  const dataCheckKey = await crypto.subtle.importKey(
+    'raw',
+    secretBuffer,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const messageBuffer = encoder.encode(message);
+  const signature = await crypto.subtle.sign('HMAC', dataCheckKey, messageBuffer);
+
+  // Convert to hex string
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export const validateTelegramWebAppData = async (initData: string, botToken: string): Promise<boolean> => {
   try {
     // Parse the init data
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
+    if (!hash) {
+      console.error('No hash found in init data');
+      return false;
+    }
     params.delete('hash');
-    
+
     // Sort the parameters alphabetically
     const sortedParams = Array.from(params.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     const dataCheckString = sortedParams.map(([key, value]) => `${key}=${value}`).join('\n');
-    
-    // Create the secret key using the bot token
-    const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
-    
-    // Calculate the hash
-    const calculatedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-    
-    // Compare the calculated hash with the provided hash
-    return calculatedHash === hash;
+
+    // Calculate the hash using Web Crypto API
+    const calculatedHash = await createHmacSha256(botToken, dataCheckString);
+
+    // Compare the calculated hash with the provided hash (case insensitive)
+    return calculatedHash.toLowerCase() === hash.toLowerCase();
   } catch (error) {
     console.error('Error validating Telegram WebApp data:', error);
     return false;

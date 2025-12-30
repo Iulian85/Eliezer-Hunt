@@ -193,7 +193,7 @@ function App() {
 
             // Validare criptografică a datelor din Telegram
             const botToken = process.env.VITE_BOT_TOKEN; // Ar trebui să fie setat ca variabilă de mediu
-            if (botToken && !validateTelegramWebAppData(tg.initData, botToken)) {
+            if (botToken && !(await validateTelegramWebAppData(tg.initData, botToken))) {
                 console.error("Invalid Telegram WebApp data");
                 setIsTelegram(false);
                 setIsLoading(false);
