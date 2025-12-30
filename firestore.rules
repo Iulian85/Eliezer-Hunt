@@ -1,0 +1,29 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    match /users/{userId} {
+      allow read: if true; 
+      allow create: if true;
+      allow update: if true; // Permitem update-ul direct pentru balanțe (User experience priority)
+    }
+    
+    match /claims/{claimId} {
+      allow read, create: if true;
+    }
+
+    match /withdrawal_requests/{reqId} {
+      allow create: if true;
+      allow read: if true;
+    }
+    
+    match /campaigns/{campId} {
+      allow read, write: if true; 
+    }
+
+    match /hotspots/{hId} {
+      allow read, write: if true;
+    }
+  }
+}
