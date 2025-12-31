@@ -8,14 +8,23 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-const usersRouter = require('./routes/users');
-const claimsRouter = require('./routes/claims');
-const campaignsRouter = require('./routes/campaigns');
-const hotspotsRouter = require('./routes/hotspots');
-const withdrawalsRouter = require('./routes/withdrawals');
-const adminRouter = require('./routes/admin');
-const aiRouter = require('./routes/ai');
+// Database connection
+const db = new Client({
+  connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+});
+
+// Connect to database
+db.connect();
+
+// Routes - pass the database connection
+const usersRouter = require('./routes/users')(db);
+const claimsRouter = require('./routes/claims')(db);
+const campaignsRouter = require('./routes/campaigns')(db);
+const hotspotsRouter = require('./routes/hotspots')(db);
+const withdrawalsRouter = require('./routes/withdrawals')(db);
+const adminRouter = require('./routes/admin')(db);
+const aiRouter = require('./routes/ai')(db);
 
 // API routes
 app.use('/api/users', usersRouter);

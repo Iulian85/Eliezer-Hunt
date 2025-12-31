@@ -1,15 +1,8 @@
 const express = require('express');
-const { Client } = require('pg');
 const router = express.Router();
 
-// Database connection
-const db = new Client({
-  connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
-});
-
-// Connect to database
-db.connect();
+// Accept database connection as parameter
+module.exports = (db) => {
 
 // Get all hotspots
 router.get('/', async (req, res) => {
@@ -109,4 +102,5 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+  return router;
+};
