@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './db';
 import { userRoutes } from './routes/user';
 import { collectRoutes } from './routes/collect';
 import { telegramRoutes } from './routes/telegram';
@@ -9,9 +9,6 @@ import { dailyRewardRoutes } from './routes/dailyReward';
 
 // Load environment variables
 dotenv.config();
-
-// Initialize Prisma client
-export const prisma = new PrismaClient();
 
 // Create Express app
 const app = express();

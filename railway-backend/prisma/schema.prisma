@@ -6,7 +6,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_PUBLIC_URL")
 }
 
 model User {
@@ -47,6 +46,7 @@ model User {
 
   claims                  Claim[]
   withdrawalRequests      WithdrawalRequest[]
+  rateLimits              RateLimit[]
 }
 
 model Claim {
