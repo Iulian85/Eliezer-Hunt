@@ -1,1 +1,131 @@
-// prisma/schema.prisma\r\n\r\ngenerator client {\r\n  provider = "prisma-client-js"\r\n}\r\n\r\ndatasource db {\r\n  provider = "postgresql"\r\n  url      = env("DATABASE_PUBLIC_URL")\r\n}\r\n\r\nmodel User {\r\n  id                      Int       @id @default(autoincrement())\r\n  telegramId              BigInt    @unique\r\n  username                String?\r\n  photoUrl                String?\r\n  deviceFingerprint       String?\r\n  joinedAt                DateTime  @default(now())\r\n  lastActive              DateTime  @default(now())\r\n  balance                 BigInt    @default(0)\r\n  tonBalance              BigInt    @default(0)\r\n  gameplayBalance         BigInt    @default(0)\r\n  rareBalance             BigInt    @default(0)\r\n  eventBalance            BigInt    @default(0)\r\n  dailySupplyBalance      BigInt    @default(0)\r\n  merchantBalance         BigInt    @default(0)\r\n  referralBalance         BigInt    @default(0)\r\n  collectedIds            String[]\r\n  biometricEnabled        Boolean   @default(true)\r\n  isBanned                Boolean   @default(false)\r\n  walletAddress           String?\r\n  referrals               Int       @default(0)\r\n  referralNames           String[]\r\n  hasClaimedReferral      Boolean   @default(false)\r\n  lastAdWatch             BigInt    @default(0)\r\n  lastDailyClaim          BigInt    @default(0)\r\n  adsWatched              Int       @default(0)\r\n  sponsoredAdsWatched     Int       @default(0)\r\n  rareItemsCollected      Int       @default(0)\r\n  eventItemsCollected     Int       @default(0)\r\n  screenshotLock          Boolean   @default(false)\r\n  isAirdropped            Boolean   @default(false)\r\n  airdropAllocation       BigInt    @default(0)\r\n  airdropTimestamp        DateTime?\r\n  createdAt               DateTime  @default(now())\r\n  updatedAt               DateTime  @updatedAt\r\n\r\n  claims                  Claim[]\r\n  withdrawalRequests      WithdrawalRequest[]\r\n}\r\n\r\nmodel Claim {\r\n  id            Int      @id @default(autoincrement())\r\n  userId        Int\r\n  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)\r\n  spawnId       String\r\n  category      String?\r\n  claimedValue  BigInt   @default(0)\r\n  tonReward     BigInt   @default(0)\r\n  status        String   @default("pending")\r\n  createdAt     DateTime @default(now())\r\n\r\n  @@index([userId])\r\n  @@index([spawnId])\r\n}\r\n\r\nmodel Campaign {\r\n  id                Int       @id @default(autoincrement())\r\n  ownerWallet       String\r\n  targetLat         Float\r\n  targetLng         Float\r\n  count             Int       @default(1)\r\n  multiplier        Int       @default(1)\r\n  durationDays      Int       @default(1)\r\n  expiryDate        BigInt?\r\n  totalPrice        BigInt    @default(0)\r\n  brandName         String?\r\n  logoUrl           String?\r\n  videoUrl          String?\r\n  videoFileName     String?\r\n  contactStreet     String?\r\n  contactCity       String?\r\n  contactZip        String?\r\n  contactCountry    String?\r\n  contactPhone      String?\r\n  contactEmail      String?\r\n  contactWebsite    String?\r\n  status            String    @default("pending_review")\r\n  createdAt         DateTime  @default(now())\r\n  updatedAt         DateTime  @updatedAt\r\n}\r\n\r\nmodel Hotspot {\r\n  id            String   @id\r\n  name          String\r\n  lat           Float\r\n  lng           Float\r\n  radius        Int      @default(100)\r\n  density       Int      @default(10)\r\n  category      String?\r\n  baseValue     BigInt   @default(100)\r\n  logoUrl       String?\r\n  customText    String?\r\n  prizes        String?  // JSON array of numbers as text\r\n  videoUrl      String?\r\n  createdAt     DateTime @default(now())\r\n  updatedAt     DateTime  @updatedAt\r\n}\r\n\r\nmodel WithdrawalRequest {\r\n  id         Int      @id @default(autoincrement())\r\n  userId     Int\r\n  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)\r\n  amount     BigInt\r\n  status     String   @default("pending")\r\n  createdAt  DateTime @default(now())\r\n  processedAt DateTime?\r\n\r\n  @@index([userId])\r\n  @@index([status])\r\n}\r\n\r\nmodel RateLimit {\r\n  id         Int      @id @default(autoincrement())\r\n  userId     Int?\r\n  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)\r\n  action     String\r\n  count      Int      @default(1)\r\n  windowStart DateTime @default(now())\r\n  createdAt  DateTime @default(now())\r\n\r\n  @@index([userId, action])\r\n}
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_PUBLIC_URL")
+}
+
+model User {
+  id                      Int       @id @default(autoincrement())
+  telegramId              BigInt    @unique
+  username                String?
+  photoUrl                String?
+  deviceFingerprint       String?
+  joinedAt                DateTime  @default(now())
+  lastActive              DateTime  @default(now())
+  balance                 BigInt    @default(0)
+  tonBalance              BigInt    @default(0)
+  gameplayBalance         BigInt    @default(0)
+  rareBalance             BigInt    @default(0)
+  eventBalance            BigInt    @default(0)
+  dailySupplyBalance      BigInt    @default(0)
+  merchantBalance         BigInt    @default(0)
+  referralBalance         BigInt    @default(0)
+  collectedIds            String[]
+  biometricEnabled        Boolean   @default(true)
+  isBanned                Boolean   @default(false)
+  walletAddress           String?
+  referrals               Int       @default(0)
+  referralNames           String[]
+  hasClaimedReferral      Boolean   @default(false)
+  lastAdWatch             BigInt    @default(0)
+  lastDailyClaim          BigInt    @default(0)
+  adsWatched              Int       @default(0)
+  sponsoredAdsWatched     Int       @default(0)
+  rareItemsCollected      Int       @default(0)
+  eventItemsCollected     Int       @default(0)
+  screenshotLock          Boolean   @default(false)
+  isAirdropped            Boolean   @default(false)
+  airdropAllocation       BigInt    @default(0)
+  airdropTimestamp        DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  claims                  Claim[]
+  withdrawalRequests      WithdrawalRequest[]
+}
+
+model Claim {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spawnId       String
+  category      String?
+  claimedValue  BigInt   @default(0)
+  tonReward     BigInt   @default(0)
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([spawnId])
+}
+
+model Campaign {
+  id                Int       @id @default(autoincrement())
+  ownerWallet       String
+  targetLat         Float
+  targetLng         Float
+  count             Int       @default(1)
+  multiplier        Int       @default(1)
+  durationDays      Int       @default(1)
+  expiryDate        BigInt?
+  totalPrice        BigInt    @default(0)
+  brandName         String?
+  logoUrl           String?
+  videoUrl          String?
+  videoFileName     String?
+  contactStreet     String?
+  contactCity       String?
+  contactZip        String?
+  contactCountry    String?
+  contactPhone      String?
+  contactEmail      String?
+  contactWebsite    String?
+  status            String    @default("pending_review")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Hotspot {
+  id            String   @id
+  name          String
+  lat           Float
+  lng           Float
+  radius        Int      @default(100)
+  density       Int      @default(10)
+  category      String?
+  baseValue     BigInt   @default(100)
+  logoUrl       String?
+  customText    String?
+  prizes        String?  // JSON array of numbers as text
+  videoUrl      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model WithdrawalRequest {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount     BigInt
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model RateLimit {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String
+  count      Int      @default(1)
+  windowStart DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId, action])
+}
