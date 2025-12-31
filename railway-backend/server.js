@@ -19,6 +19,8 @@ async function runMigrations() {
   let client;
   try {
     console.log('Starting migration process...');
+    console.log('Current working directory:', process.cwd());
+    console.log('Server file location:', __dirname);
     console.log('DATABASE_PUBLIC_URL exists:', !!process.env.DATABASE_PUBLIC_URL);
     console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
 
