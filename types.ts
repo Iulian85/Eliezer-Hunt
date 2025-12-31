@@ -80,25 +80,62 @@ export interface SpawnPoint {
     videoUrl?: string; // For GIFTBOX
 }
 
-export interface UserState {
-    balance: number; 
-    tonBalance: number; 
-    gameplayBalance: number; 
-    rareBalance: number; 
-    eventBalance: number; 
-    dailySupplyBalance: number; 
-    merchantBalance: number; 
-    referralBalance: number; 
+export interface User {
+    id: number;
+    telegramId: string;
+    username?: string;
+    photoUrl?: string;
+    deviceFingerprint?: string;
+    joinedAt: string;
+    lastActive: string;
+    balance: string;
+    tonBalance: string;
+    gameplayBalance: string;
+    rareBalance: string;
+    eventBalance: string;
+    dailySupplyBalance: string;
+    merchantBalance: string;
+    referralBalance: string;
     collectedIds: string[];
-    location: Coordinate | null;
-    lastAdWatch: number; 
-    lastDailyClaim: number; 
+    biometricEnabled: boolean;
+    isBanned: boolean;
+    walletAddress?: string;
+    referrals: number;
+    referralNames: string[];
+    hasClaimedReferral: boolean;
+    lastAdWatch: string;
+    lastDailyClaim: string;
     adsWatched: number;
     sponsoredAdsWatched: number;
-    rareItemsCollected: number; 
-    eventItemsCollected: number; 
+    rareItemsCollected: number;
+    eventItemsCollected: number;
+    screenshotLock: boolean;
+    isAirdropped: boolean;
+    airdropAllocation: string;
+    airdropTimestamp?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface UserState {
+    balance: number;
+    tonBalance: number;
+    gameplayBalance: number;
+    rareBalance: number;
+    eventBalance: number;
+    dailySupplyBalance: number;
+    merchantBalance: number;
+    referralBalance: number;
+    collectedIds: string[];
+    location: Coordinate | null;
+    lastAdWatch: number;
+    lastDailyClaim: number;
+    adsWatched: number;
+    sponsoredAdsWatched: number;
+    rareItemsCollected: number;
+    eventItemsCollected: number;
     referrals: number;
-    referralNames?: string[]; 
+    referralNames?: string[];
     hasClaimedReferral?: boolean;
     telegramId?: number;
     username?: string;
