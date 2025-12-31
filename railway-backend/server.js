@@ -11,9 +11,7 @@ app.use(express.urlencoded({ extended: true }));
 // Database connection
 const db = new Client({
   connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  },
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false, // Only use SSL for non-local connections
 });
 
 // Function to run migrations
@@ -75,6 +73,12 @@ async function runMigrations() {
 
       const schemaPath = path.join(__dirname, '..', 'migrations', '01_schema.sql');
       console.log('Reading schema file from:', schemaPath);
+
+      // Check if file exists before trying to read it
+      if (!fs.existsSync(schemaPath)) {
+        throw new Error(`Migration file does not exist at path: ${schemaPath}`);
+      }
+
       const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
       console.log('Schema file read, length:', schemaSQL.length);
 
