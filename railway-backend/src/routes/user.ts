@@ -4,16 +4,17 @@ import { prisma } from '../db';
 const router = Router();
 
 // Get user by Telegram ID
-router.get('/:telegramId', async (req: Request, res: Response) => {
+router.get('/:telegramId', async (req: Request, res: Response): Promise<void> => {
   try {
     const { telegramId } = req.params;
-    
+
     const user = await prisma.user.findUnique({
       where: { telegramId: BigInt(telegramId) },
     });
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found' });
+      return;
     }
 
     res.json({ user });
@@ -24,7 +25,7 @@ router.get('/:telegramId', async (req: Request, res: Response) => {
 });
 
 // Create or update user
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       telegramId,
@@ -199,6 +200,74 @@ router.put('/:telegramId/biometric', async (req: Request, res: Response) => {
     res.json({ user });
   } catch (error) {
     console.error('Error toggling user biometric setting:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Endpoint for watching regular ads
+router.post('/:telegramId/watch-ad', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { telegramId } = req.params;
+    const { rewardAmount = 10 } = req.body; // Default reward amount
+
+    // Update user's ad watch info and balances
+    const user = await prisma.user.update({
+      where: { telegramId: BigInt(telegramId) },
+      data: {
+        lastAdWatch: Date.now(),
+        adsWatched: { increment: 1 },
+        balance: { increment: BigInt(rewardAmount) },
+        gameplayBalance: { increment: BigInt(rewardAmount) },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Ad watched successfully, ${rewardAmount} points added`,
+      user: {
+        id: user.id,
+        telegramId: user.telegramId.toString(),
+        balance: user.balance.toString(),
+        gameplayBalance: user.gameplayBalance.toString(),
+        adsWatched: user.adsWatched
+      }
+    });
+  } catch (error) {
+    console.error('Error processing ad watch:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Endpoint for watching sponsored ads
+router.post('/:telegramId/watch-sponsored-ad', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { telegramId } = req.params;
+    const { rewardAmount = 50 } = req.body; // Default reward amount for sponsored ads
+
+    // Update user's sponsored ad watch info and balances
+    const user = await prisma.user.update({
+      where: { telegramId: BigInt(telegramId) },
+      data: {
+        lastAdWatch: Date.now(),
+        sponsoredAdsWatched: { increment: 1 },
+        balance: { increment: BigInt(rewardAmount) },
+        gameplayBalance: { increment: BigInt(rewardAmount) },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Sponsored ad watched successfully, ${rewardAmount} points added`,
+      user: {
+        id: user.id,
+        telegramId: user.telegramId.toString(),
+        balance: user.balance.toString(),
+        gameplayBalance: user.gameplayBalance.toString(),
+        sponsoredAdsWatched: user.sponsoredAdsWatched
+      }
+    });
+  } catch (error) {
+    console.error('Error processing sponsored ad watch:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

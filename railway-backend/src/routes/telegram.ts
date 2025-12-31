@@ -4,16 +4,17 @@ import { prisma } from '../db';
 const router = Router();
 
 // Verify Telegram init data
-router.post('/verify', async (req: Request, res: Response) => {
+router.post('/verify', async (req: Request, res: Response): Promise<void> => {
   try {
     const { initData } = req.body;
-    
+
     // In a real implementation, you would verify the Telegram init data here
     // This is a simplified version
     if (!initData) {
-      return res.status(400).json({ error: 'Missing init data' });
+      res.status(400).json({ error: 'Missing init data' });
+      return;
     }
-    
+
     // Verification logic would go here
     // For now, we just return success
     res.json({ verified: true, message: 'Telegram init data verified' });

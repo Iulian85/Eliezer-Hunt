@@ -1,1 +1,11 @@
-import { PrismaClient } from "@prisma/client";\r\n\r\nconst globalForPrisma = global as unknown as { prisma: PrismaClient };\r\n\r\nexport const prisma =\r\n  globalForPrisma.prisma ||\r\n  new PrismaClient({\r\n    datasources: {\r\n      db: {\r\n        url: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL || "",\r\n      },\r\n    },\r\n  });\r\n\r\nif (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;\r\n\r\nexport default prisma;
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+export default prisma;
