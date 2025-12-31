@@ -40,15 +40,10 @@ app.get('/', (req, res) => {
   res.json({ message: 'ELZR Hunt Railway Backend API' });
 });
 
-// Database connection
-const db = new Client({
-  connectionString: process.env.DATABASE_PUBLIC_URL,
-  ssl: { rejectUnauthorized: false }, // SSL mode prefer - encryption is used if the server supports it
-});
 
 // Function to run migrations
 async function runMigrations() {
-  let client;
+  let migrationDb;
   try {
     console.log('Starting migration process...');
     const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
@@ -57,16 +52,16 @@ async function runMigrations() {
       return;
     }
 
-    client = new Client({
+    migrationDb = new Client({
       connectionString,
       ssl: { rejectUnauthorized: false },
     });
 
-    await client.connect();
-    console.log('Connected to database');
+    await migrationDb.connect();
+    console.log('Connected to database for migrations');
 
     // Creează tabelele direct în cod (adaptează la schema ta exactă)
-    await client.query(`
+    await migrationDb.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         telegram_id BIGINT UNIQUE NOT NULL,
@@ -231,7 +226,7 @@ async function runMigrations() {
     console.error('Migration failed (server will continue):', error.message);
     // Server-ul continuă chiar dacă migrarea eșuează
   } finally {
-    if (client) await client.end();
+    if (migrationDb) await migrationDb.end();
   }
 }
 
