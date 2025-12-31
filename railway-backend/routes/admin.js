@@ -17,7 +17,7 @@ router.get('/wallet', async (req, res) => {
     // In a real implementation, this would fetch from a secure configuration
     // For now, we'll return a placeholder
     res.json({ 
-      adminWalletAddress: process.env.ADMIN_WALLET_ADDRESS || 'EQDvY_364KXv28x2bD7Z6K1j6a3N4P7Q9R2S5T8U1V4W7X0Y3Z' 
+      adminWalletAddress: process.env.ADMIN_WALLET_ADDRESS || 'UQCpvC9nskdZ9hqMths4jifCMKganQX05CZrCXSyWuyNkOwp' 
     });
   } catch (error) {
     console.error('Error fetching admin wallet:', error);
