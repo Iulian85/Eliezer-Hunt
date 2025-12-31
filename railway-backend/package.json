@@ -4,23 +4,35 @@
   "description": "Railway backend for ELZR Hunt game",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "migrate": "node migrate.js"
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "dev:watch": "nodemon --exec ts-node src/server.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/client": "^5.0.0",
     "express": "4.21.1",
-    "pg": "8.11.3",
     "cors": "2.8.5",
     "dotenv": "16.4.5",
     "bcryptjs": "2.4.3",
     "jsonwebtoken": "9.0.2",
     "axios": "1.6.7",
     "rate-limiter-flexible": "4.0.1",
-    "@google/generative-ai": "0.21.0"
+    "@google/generative-ai": "0.21.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   },
   "devDependencies": {
-    "nodemon": "3.0.3"
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.0.0",
+    "nodemon": "3.0.3",
+    "prisma": "^5.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.0"
   },
   "keywords": ["elzr-hunt", "game", "telegram", "crypto"],
   "author": "ELZR Hunt Team",
