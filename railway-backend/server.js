@@ -44,7 +44,8 @@ async function runMigrations() {
     console.log('Starting migration process...');
     const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
     if (!connectionString) {
-      throw new Error('No database connection string. Set DATABASE_URL or DATABASE_PUBLIC_URL');
+      console.warn('No database connection string. Skipping migrations.');
+      return;
     }
 
     client = new Client({
@@ -216,35 +217,31 @@ async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_campaigns_owner_wallet ON campaigns(owner_wallet);
     `);
 
-    console.log('Tables created or already exist');
-    await client.end();
+    console.log('Migration completed successfully');
   } catch (error) {
-    console.error('Migration error:', error.message, error.stack);
+    console.error('Migration failed (server will continue):', error.message);
+    // Server-ul continuă chiar dacă migrarea eșuează
+  } finally {
     if (client) await client.end();
-    process.exit(1);
   }
 }
 
 // Run migrations first, then start the server
 async function startServer() {
-  try {
-    await runMigrations();
+  // Run migrations but don't stop server if they fail
+  await runMigrations();
 
-    // Error handling middleware
-    app.use((err, req, res, next) => {
-      console.error(err.stack);
-      res.status(500).json({ error: 'Something went wrong!' });
-    });
+  // Error handling middleware
+  app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
+  });
 
-    // Start server
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
+  // Start server
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
 }
 
 startServer();
