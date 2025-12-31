@@ -1,0 +1,28 @@
+{
+  "name": "elzr-hunt-railway-backend",
+  "version": "1.0.0",
+  "description": "Railway backend for ELZR Hunt game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "migrate": "node migrate.js"
+  },
+  "dependencies": {
+    "express": "4.21.1",
+    "pg": "8.11.3",
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "bcryptjs": "2.4.3",
+    "jsonwebtoken": "9.0.2",
+    "axios": "1.6.7",
+    "rate-limiter-flexible": "4.0.1",
+    "@google/generative-ai": "0.21.0"
+  },
+  "devDependencies": {
+    "nodemon": "3.0.3"
+  },
+  "keywords": ["elzr-hunt", "game", "telegram", "crypto"],
+  "author": "ELZR Hunt Team",
+  "license": "MIT"
+}
