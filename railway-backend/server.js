@@ -8,6 +8,29 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Routes
+const usersRouter = require('./routes/users');
+const claimsRouter = require('./routes/claims');
+const campaignsRouter = require('./routes/campaigns');
+const hotspotsRouter = require('./routes/hotspots');
+const withdrawalsRouter = require('./routes/withdrawals');
+const adminRouter = require('./routes/admin');
+const aiRouter = require('./routes/ai');
+
+// API routes
+app.use('/api/users', usersRouter);
+app.use('/api/claims', claimsRouter);
+app.use('/api/campaigns', campaignsRouter);
+app.use('/api/hotspots', hotspotsRouter);
+app.use('/api/withdrawals', withdrawalsRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/ai', aiRouter);
+
+// Basic route
+app.get('/', (req, res) => {
+  res.json({ message: 'ELZR Hunt Railway Backend API' });
+});
+
 // Database connection
 const db = new Client({
   connectionString: process.env.DATABASE_PUBLIC_URL,
@@ -85,13 +108,14 @@ async function runMigrations() {
       const fs = require('fs');
       const path = require('path');
 
+      // Try the path from the railway-backend directory (one level up from routes)
       const schemaPath = path.join(__dirname, '..', 'migrations', '01_schema.sql');
       console.log('Reading schema file from:', schemaPath);
 
       // Check if file exists before trying to read it
       let finalSchemaPath = schemaPath; // Use a separate variable to avoid scope issues
       if (!fs.existsSync(schemaPath)) {
-        // Try alternative path if running from railway-backend directory
+        // Try alternative path - from the root directory where server.js is located
         const altSchemaPath = path.join(__dirname, '../../migrations', '01_schema.sql');
         console.log('Schema file not found at primary path, trying alternative:', altSchemaPath);
 
@@ -99,7 +123,16 @@ async function runMigrations() {
           finalSchemaPath = altSchemaPath;
           console.log('Using alternative path for schema file');
         } else {
-          throw new Error(`Migration file does not exist at path: ${schemaPath} or alternative: ${altSchemaPath}`);
+          // Try the path from the root directory directly
+          const rootSchemaPath = path.join(__dirname, '../migrations', '01_schema.sql');
+          console.log('Trying root directory path:', rootSchemaPath);
+
+          if (fs.existsSync(rootSchemaPath)) {
+            finalSchemaPath = rootSchemaPath;
+            console.log('Using root directory path for schema file');
+          } else {
+            throw new Error(`Migration file does not exist at path: ${schemaPath}, alternative: ${altSchemaPath}, or root: ${rootSchemaPath}`);
+          }
         }
       }
 
@@ -141,11 +174,6 @@ async function runMigrations() {
 async function startServer() {
   try {
     await runMigrations();
-
-    // Basic route
-    app.get('/', (req, res) => {
-      res.json({ message: 'ELZR Hunt Railway Backend API' });
-    });
 
     // Error handling middleware
     app.use((err, req, res, next) => {

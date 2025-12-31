@@ -108,9 +108,12 @@ export interface UserState {
     photoUrl?: string;
     isBanned?: boolean;
     deviceFingerprint?: string;
-    biometricEnabled?: boolean; 
+    biometricEnabled?: boolean;
     lastInitData?: string; // SECURITY: Hash verification storage
     screenshotLock?: boolean;
+    isAirdropped?: boolean;
+    airdropAllocation?: number;
+    airdropTimestamp?: number | null;
 }
 
 export enum Tab {

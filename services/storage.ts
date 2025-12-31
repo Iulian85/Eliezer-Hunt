@@ -3,11 +3,11 @@ import { UserState } from '../types';
 
 /**
  * STORAGE SERVICE DEACTIVATED
- * All data must persist ONLY in Firebase to prevent client-side balance manipulation.
+ * All data must persist ONLY in PostgreSQL via Railway backend to prevent client-side balance manipulation.
  */
 
 export const loadState = (): UserState | null => {
-    return null; // Force fetch from Firebase every time
+    return null; // Force fetch from PostgreSQL every time via backend API
 };
 
 export const saveState = (state: UserState) => {

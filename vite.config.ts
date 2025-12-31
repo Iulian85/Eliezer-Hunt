@@ -52,8 +52,6 @@ export default defineConfig({
     include: [
       'react',
       'react-dom',
-      'firebase/app',
-      'firebase/firestore',
       'lucide-react',
       '@fingerprintjs/fingerprintjs',
       '@google/genai',

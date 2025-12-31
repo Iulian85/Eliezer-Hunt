@@ -9,20 +9,20 @@ import { Sparkles, ShieldAlert, ExternalLink, UserX, AlertTriangle, Fingerprint,
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 import {
-    syncUserWithFirebase,
-    saveCollectionToFirebase,
+    syncUserWithDatabase,
+    saveCollectionToDatabase,
     processReferralReward,
     subscribeToCampaigns,
     subscribeToHotspots,
     subscribeToUserProfile,
-    createCampaignFirebase,
-    updateCampaignStatusFirebase,
-    deleteCampaignFirebase,
-    saveHotspotFirebase,
-    deleteHotspotFirebase,
-    updateUserWalletInFirebase,
-    resetUserInFirebase
-} from './services/firebase';
+    createCampaignDatabase,
+    updateCampaignStatusDatabase,
+    deleteCampaignDatabase,
+    saveHotspotDatabase,
+    deleteHotspotDatabase,
+    updateUserWalletInDatabase,
+    resetUserInDatabase
+} from './services/database';
 
 import {
     validateTelegramWebAppData,
@@ -86,11 +86,11 @@ function App() {
     const [adminWalletAddress, setAdminWalletAddress] = useState<string | null>(null);
 
     useEffect(() => {
-        // Obține adresa de admin de pe server prin funcția Firebase
+        // Obține adresa de admin de pe server prin funcția Database
         const fetchAdminWallet = async () => {
             try {
-                // Apel către funcția Firebase pentru a obține adresa de admin
-                const { getAdminWallet } = await import('./services/firebase');
+                // Apel către funcția Database pentru a obține adresa de admin
+                const { getAdminWallet } = await import('./services/database');
                 const result = await getAdminWallet();
                 if (result && result.adminWalletAddress) {
                     setAdminWalletAddress(result.adminWalletAddress);
@@ -244,7 +244,7 @@ function App() {
                     console.warn("Fingerprint detection timeout");
                 }
 
-                const synced = await syncUserWithFirebase(userData, defaultUserState, fingerprint);
+                const synced = await syncUserWithDatabase(userData, defaultUserState, fingerprint);
                 setUserState(prev => ({ ...prev, ...synced }));
 
                 if (!synced.deviceFingerprint || synced.joinedAt === synced.lastActive) {
@@ -326,7 +326,7 @@ function App() {
 
     useEffect(() => {
         if (userWalletAddress && userState.telegramId) {
-            updateUserWalletInFirebase(userState.telegramId, userWalletAddress);
+            updateUserWalletInDatabase(userState.telegramId, userWalletAddress);
             setUserState(prev => ({ ...prev, walletAddress: userWalletAddress }));
         }
     }, [userWalletAddress, userState.telegramId]);
@@ -354,7 +354,7 @@ function App() {
         if (!isAd && userState.collectedIds.includes(spawnId)) return;
         
         if (userState.telegramId) {
-            await saveCollectionToFirebase(userState.telegramId, spawnId, value, category, tonReward);
+            await saveCollectionToDatabase(userState.telegramId, spawnId, value, category, tonReward);
         }
 
         setSpawns(prev => prev.filter(s => s.id !== spawnId));
@@ -377,7 +377,7 @@ function App() {
     const handleResetAccount = async () => {
         if (window.confirm("RESET ACCOUNT: Are you sure you want to permanently delete all progress?")) {
             if (userState.telegramId) {
-                await resetUserInFirebase(userState.telegramId);
+                await resetUserInDatabase(userState.telegramId);
                 window.location.reload();
             }
         }
@@ -550,9 +550,9 @@ function App() {
                                 data: { ...data, status: AdStatus.PENDING_REVIEW },
                                 timestamp: Date.now() 
                             };
-                            await createCampaignFirebase(camp);
+                            await createCampaignDatabase(camp);
                         }} 
-                        onPayCampaign={(id) => updateCampaignStatusFirebase(id, AdStatus.ACTIVE)} 
+                        onPayCampaign={(id) => updateCampaignStatusDatabase(id, AdStatus.ACTIVE)} 
                         isTestMode={isTestMode} 
                     />
                 )}
@@ -561,16 +561,16 @@ function App() {
                         allCampaigns={campaigns} 
                         customHotspots={customHotspots} 
                         onSaveHotspots={async (newHotspots) => {
-                            for (const h of newHotspots) await saveHotspotFirebase(h);
+                            for (const h of newHotspots) await saveHotspotDatabase(h);
                         }} 
                         onDeleteHotspot={async (id) => {
-                            await deleteHotspotFirebase(id);
+                            await deleteHotspotDatabase(id);
                         }}
                         onDeleteCampaign={async (id) => {
-                            await deleteCampaignFirebase(id);
+                            await deleteCampaignDatabase(id);
                         }}
-                        onApprove={(id) => updateCampaignStatusFirebase(id, AdStatus.ACTIVE)} 
-                        onReject={(id) => updateCampaignStatusFirebase(id, AdStatus.REJECTED)} 
+                        onApprove={(id) => updateCampaignStatusDatabase(id, AdStatus.ACTIVE)}
+                        onReject={(id) => updateCampaignStatusDatabase(id, AdStatus.REJECTED)}
                         onResetMyAccount={handleResetAccount} 
                         isTestMode={isTestMode} 
                         onToggleTestMode={() => setIsTestMode(!isTestMode)} 

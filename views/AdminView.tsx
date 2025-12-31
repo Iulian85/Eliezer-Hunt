@@ -7,7 +7,7 @@ import { UniversalVideoPlayer } from '../components/UniversalVideoPlayer';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
-import { getAllUsersAdmin, deleteUserFirebase, toggleUserBan, resetUserInFirebase, toggleUserBiometricSetting, markUserAirdropped, subscribeToWithdrawalRequests, updateWithdrawalStatus } from '../services/firebase';
+import { getAllUsersAdmin, deleteUserDatabase, toggleUserBan, resetUserInDatabase, toggleUserBiometricSetting, markUserAirdropped, subscribeToWithdrawalRequests, updateWithdrawalStatus } from '../services/database';
 
 interface AdminViewProps {
     allCampaigns: Campaign[];
@@ -116,14 +116,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
     const handleDeleteUser = async (id: string) => {
         if (window.confirm(`CRITICAL WARNING: Permanently delete user ${id}? This action IS IRREVERSIBLE.`)) {
-            await deleteUserFirebase(id);
+            await deleteUserDatabase(id);
             setUsers(prev => prev.filter(u => u.id !== id));
         }
     };
 
     const handleResetUserAccount = async (id: string) => {
         if (window.confirm(`ACCOUNT RESET: Clear all extraction progress for user ${id}?`)) {
-            await resetUserInFirebase(parseInt(id));
+            await resetUserInDatabase(parseInt(id));
             alert("Account progress has been reset.");
             loadUsers();
         }

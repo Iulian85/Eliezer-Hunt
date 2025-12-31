@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, X, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { askGeminiProxy } from '../services/firebase';
+import { askGeminiProxy } from '../services/database';
 
 interface Message {
   role: 'user' | 'model';

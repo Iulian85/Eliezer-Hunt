@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { TonConnectButton } from '@tonconnect/ui-react';
 import { Gift, Loader2, ShieldCheck, Coins, TrendingUp, Megaphone, Star, Sparkles, Clock, Users, Wallet, ArrowUpRight, MapPin, Target, ShoppingBag, Crown } from 'lucide-react';
 import { showRewardedAd } from '../services/adsgram';
-import { processWithdrawTON } from '../services/firebase';
+import { processWithdrawTON } from '../services/database';
 import { REWARD_AD_VALUE, ADSGRAM_BLOCK_ID } from '../constants';
 import { UserState } from '../types';
 

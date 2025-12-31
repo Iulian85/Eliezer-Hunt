@@ -157,8 +157,8 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
                 setIsPaying(null);
                 return;
             }
-            // Obține adresa de admin de pe server prin funcția Firebase
-            const { getAdminWallet } = await import('../services/firebase');
+            // Obține adresa de admin de pe server prin funcția Database
+            const { getAdminWallet } = await import('../services/database');
             const result = await getAdminWallet();
             if (!result || !result.adminWalletAddress) {
                 throw new Error('Could not fetch admin wallet address');
