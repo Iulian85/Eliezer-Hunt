@@ -10,7 +10,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Database connection
 const db = new Client({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
   },
