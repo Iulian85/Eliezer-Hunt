@@ -10,8 +10,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Database connection
 const db = new Client({
-  connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false, // Only use SSL for non-local connections
+  connectionString: process.env.DATABASE_PUBLIC_URL,
+  ssl: { rejectUnauthorized: false }, // SSL mode prefer - encryption is used if the server supports it
 });
 
 // Function to run migrations
@@ -22,10 +22,18 @@ async function runMigrations() {
     console.log('Current working directory:', process.cwd());
     console.log('Server file location:', __dirname);
     console.log('DATABASE_PUBLIC_URL exists:', !!process.env.DATABASE_PUBLIC_URL);
-    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('DATABASE_PUBLIC_URL value:', process.env.DATABASE_PUBLIC_URL ? 'SET' : 'NOT SET');
+
+    // Check if database URL is provided
+    const connectionString = process.env.DATABASE_PUBLIC_URL;
+    if (!connectionString) {
+      throw new Error('No database connection string provided. Please set DATABASE_PUBLIC_URL environment variable.');
+    }
+
+    console.log('Using connection string (first 50 chars):', connectionString.substring(0, 50) + '...');
 
     client = new Client({
-      connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
+      connectionString: connectionString,
       ssl: {
         rejectUnauthorized: false
       },
@@ -34,6 +42,10 @@ async function runMigrations() {
     console.log('Attempting to connect to database...');
     await client.connect();
     console.log('Connected to database for migrations');
+
+    // Test the connection by running a simple query
+    const result = await client.query('SELECT version();');
+    console.log('Database version info:', result.rows[0].version);
 
     // Check if migration table exists
     console.log('Checking if migrations table exists...');
@@ -77,11 +89,21 @@ async function runMigrations() {
       console.log('Reading schema file from:', schemaPath);
 
       // Check if file exists before trying to read it
+      let finalSchemaPath = schemaPath; // Use a separate variable to avoid scope issues
       if (!fs.existsSync(schemaPath)) {
-        throw new Error(`Migration file does not exist at path: ${schemaPath}`);
+        // Try alternative path if running from railway-backend directory
+        const altSchemaPath = path.join(__dirname, '../../migrations', '01_schema.sql');
+        console.log('Schema file not found at primary path, trying alternative:', altSchemaPath);
+
+        if (fs.existsSync(altSchemaPath)) {
+          finalSchemaPath = altSchemaPath;
+          console.log('Using alternative path for schema file');
+        } else {
+          throw new Error(`Migration file does not exist at path: ${schemaPath} or alternative: ${altSchemaPath}`);
+        }
       }
 
-      const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+      const schemaSQL = fs.readFileSync(finalSchemaPath, 'utf8');
       console.log('Schema file read, length:', schemaSQL.length);
 
       console.log('Executing schema migration...');
