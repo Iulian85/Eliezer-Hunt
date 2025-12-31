@@ -42,130 +42,185 @@ async function runMigrations() {
   let client;
   try {
     console.log('Starting migration process...');
-    console.log('Current working directory:', process.cwd());
-    console.log('Server file location:', __dirname);
-    console.log('DATABASE_PUBLIC_URL exists:', !!process.env.DATABASE_PUBLIC_URL);
-    console.log('DATABASE_PUBLIC_URL value:', process.env.DATABASE_PUBLIC_URL ? 'SET' : 'NOT SET');
-
-    // Check if database URL is provided
-    const connectionString = process.env.DATABASE_PUBLIC_URL;
+    const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
     if (!connectionString) {
-      throw new Error('No database connection string provided. Please set DATABASE_PUBLIC_URL environment variable.');
+      throw new Error('No database connection string. Set DATABASE_URL or DATABASE_PUBLIC_URL');
     }
-
-    console.log('Using connection string (first 50 chars):', connectionString.substring(0, 50) + '...');
 
     client = new Client({
-      connectionString: connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      },
+      connectionString,
+      ssl: { rejectUnauthorized: false },
     });
 
-    console.log('Attempting to connect to database...');
     await client.connect();
-    console.log('Connected to database for migrations');
+    console.log('Connected to database');
 
-    // Test the connection by running a simple query
-    const result = await client.query('SELECT version();');
-    console.log('Database version info:', result.rows[0].version);
-
-    // Check if migration table exists
-    console.log('Checking if migrations table exists...');
-    const migrationTableExists = await client.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_name = 'migrations'
+    // Creează tabelele direct în cod (adaptează la schema ta exactă)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        telegram_id BIGINT UNIQUE NOT NULL,
+        username VARCHAR(255),
+        photo_url TEXT,
+        device_fingerprint VARCHAR(255),
+        joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        balance BIGINT DEFAULT 0,
+        ton_balance BIGINT DEFAULT 0,
+        gameplay_balance BIGINT DEFAULT 0,
+        rare_balance BIGINT DEFAULT 0,
+        event_balance BIGINT DEFAULT 0,
+        daily_supply_balance BIGINT DEFAULT 0,
+        merchant_balance BIGINT DEFAULT 0,
+        referral_balance BIGINT DEFAULT 0,
+        collected_ids TEXT[] DEFAULT '{}',
+        biometric_enabled BOOLEAN DEFAULT true,
+        is_banned BOOLEAN DEFAULT false,
+        wallet_address VARCHAR(255),
+        referrals INTEGER DEFAULT 0,
+        referral_names TEXT[] DEFAULT '{}',
+        has_claimed_referral BOOLEAN DEFAULT false,
+        last_ad_watch BIGINT DEFAULT 0,
+        last_daily_claim BIGINT DEFAULT 0,
+        ads_watched INTEGER DEFAULT 0,
+        sponsored_ads_watched INTEGER DEFAULT 0,
+        rare_items_collected INTEGER DEFAULT 0,
+        event_items_collected INTEGER DEFAULT 0,
+        last_init_data TEXT,
+        screenshot_lock BOOLEAN DEFAULT false,
+        is_airdropped BOOLEAN DEFAULT false,
+        airdrop_allocation BIGINT DEFAULT 0,
+        airdrop_timestamp TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Function to update updated_at timestamp
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+      END;
+      $$ language 'plpgsql';
+
+      -- Trigger to update updated_at for users table
+      CREATE TRIGGER update_users_updated_at
+          BEFORE UPDATE ON users
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+
+      CREATE TABLE IF NOT EXISTS claims (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        spawn_id VARCHAR(255) NOT NULL,
+        category VARCHAR(50),
+        claimed_value BIGINT DEFAULT 0,
+        ton_reward BIGINT DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Index for claims table
+      CREATE INDEX IF NOT EXISTS idx_claims_user_id ON claims(user_id);
+      CREATE INDEX IF NOT EXISTS idx_claims_spawn_id ON claims(spawn_id);
+
+      CREATE TABLE IF NOT EXISTS campaigns (
+        id SERIAL PRIMARY KEY,
+        owner_wallet VARCHAR(255) NOT NULL,
+        target_lat DECIMAL(10, 8) NOT NULL,
+        target_lng DECIMAL(11, 8) NOT NULL,
+        count INTEGER DEFAULT 1,
+        multiplier INTEGER DEFAULT 1,
+        duration_days INTEGER DEFAULT 1,
+        expiry_date BIGINT,
+        total_price BIGINT DEFAULT 0,
+        brand_name VARCHAR(255),
+        logo_url TEXT,
+        video_url TEXT,
+        video_file_name TEXT,
+        contact_street VARCHAR(255),
+        contact_city VARCHAR(255),
+        contact_zip VARCHAR(50),
+        contact_country VARCHAR(100),
+        contact_phone VARCHAR(50),
+        contact_email VARCHAR(255),
+        contact_website VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'pending_review',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Trigger to update updated_at for campaigns table
+      CREATE TRIGGER update_campaigns_updated_at
+          BEFORE UPDATE ON campaigns
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+
+      CREATE TABLE IF NOT EXISTS hotspots (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        lat DECIMAL(10, 8) NOT NULL,
+        lng DECIMAL(11, 8) NOT NULL,
+        radius INTEGER DEFAULT 100,
+        density INTEGER DEFAULT 10,
+        category VARCHAR(50),
+        base_value BIGINT DEFAULT 100,
+        logo_url TEXT,
+        custom_text VARCHAR(100),
+        prizes TEXT, -- JSON array of numbers as text
+        video_url TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Trigger to update updated_at for hotspots table
+      CREATE TRIGGER update_hotspots_updated_at
+          BEFORE UPDATE ON hotspots
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+
+      CREATE TABLE IF NOT EXISTS withdrawal_requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount BIGINT NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        processed_at TIMESTAMP WITH TIME ZONE
+      );
+
+      -- Index for withdrawal_requests table
+      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user_id ON withdrawal_requests(user_id);
+      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status ON withdrawal_requests(status);
+
+      -- Rate limits table (for API rate limiting)
+      CREATE TABLE IF NOT EXISTS rate_limits (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        action VARCHAR(100) NOT NULL,
+        count INTEGER DEFAULT 1,
+        window_start TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Index for rate_limits table
+      CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action ON rate_limits(user_id, action);
+
+      -- Indexes for performance
+      CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
+      CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
+      CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
+      CREATE INDEX IF NOT EXISTS idx_claims_created_at ON claims(created_at);
+      CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at);
+      CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
+      CREATE INDEX IF NOT EXISTS idx_campaigns_owner_wallet ON campaigns(owner_wallet);
     `);
 
-    console.log('Migration table exists:', migrationTableExists.rows[0].exists);
-    if (!migrationTableExists.rows[0].exists) {
-      console.log('Creating migrations table...');
-      // Create migrations table
-      await client.query(`
-        CREATE TABLE migrations (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(255) UNIQUE NOT NULL,
-          executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-      `);
-      console.log('Created migrations table');
-    }
-
-    // Check if schema migration has already been run
-    console.log('Checking if schema migration has already been run...');
-    const schemaMigrationExists = await client.query(
-      'SELECT name FROM migrations WHERE name = $1',
-      ['01_schema.sql']
-    );
-
-    console.log('Schema migration exists in migrations table:', schemaMigrationExists.rows.length > 0);
-    if (schemaMigrationExists.rows.length === 0) {
-      console.log('Schema migration not found, executing...');
-      // Read and execute schema migration
-      const fs = require('fs');
-      const path = require('path');
-
-      // Try the path from the railway-backend directory (one level up from routes)
-      const schemaPath = path.join(__dirname, '..', 'migrations', '01_schema.sql');
-      console.log('Reading schema file from:', schemaPath);
-
-      // Check if file exists before trying to read it
-      let finalSchemaPath = schemaPath; // Use a separate variable to avoid scope issues
-      if (!fs.existsSync(schemaPath)) {
-        // Try alternative path - from the root directory where server.js is located
-        const altSchemaPath = path.join(__dirname, '../../migrations', '01_schema.sql');
-        console.log('Schema file not found at primary path, trying alternative:', altSchemaPath);
-
-        if (fs.existsSync(altSchemaPath)) {
-          finalSchemaPath = altSchemaPath;
-          console.log('Using alternative path for schema file');
-        } else {
-          // Try the path from the root directory directly
-          const rootSchemaPath = path.join(__dirname, '../migrations', '01_schema.sql');
-          console.log('Trying root directory path:', rootSchemaPath);
-
-          if (fs.existsSync(rootSchemaPath)) {
-            finalSchemaPath = rootSchemaPath;
-            console.log('Using root directory path for schema file');
-          } else {
-            throw new Error(`Migration file does not exist at path: ${schemaPath}, alternative: ${altSchemaPath}, or root: ${rootSchemaPath}`);
-          }
-        }
-      }
-
-      const schemaSQL = fs.readFileSync(finalSchemaPath, 'utf8');
-      console.log('Schema file read, length:', schemaSQL.length);
-
-      console.log('Executing schema migration...');
-      await client.query(schemaSQL);
-      console.log('Schema migration executed successfully');
-
-      // Record that this migration was executed
-      await client.query(
-        'INSERT INTO migrations (name) VALUES ($1)',
-        ['01_schema.sql']
-      );
-
-      console.log('Recorded schema migration execution');
-    } else {
-      console.log('Schema migration already executed, skipping');
-    }
-
+    console.log('Tables created or already exist');
     await client.end();
-    console.log('Migration check completed');
   } catch (error) {
-    console.error('Error running migrations:', error);
-    console.error('Error stack:', error.stack);
-    if (client) {
-      try {
-        await client.end();
-      } catch (endError) {
-        console.error('Error closing client:', endError);
-      }
-    }
+    console.error('Migration error:', error.message, error.stack);
+    if (client) await client.end();
     process.exit(1);
   }
 }
