@@ -25,3 +25,5 @@ dist-ssr
 
 # Large files
 firebase-tools-instant-win.exe
+
+/src/generated/prisma

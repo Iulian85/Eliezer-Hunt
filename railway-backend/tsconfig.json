@@ -1,1 +1,38 @@
-{\r\n  "compilerOptions": {\r\n    "target": "ES2020",\r\n    "module": "commonjs",\r\n    "lib": ["ES2020"],\r\n    "outDir": "./dist",\r\n    "rootDir": "./src",\r\n    "strict": true,\r\n    "esModuleInterop": true,\r\n    "skipLibCheck": true,\r\n    "forceConsistentCasingInFileNames": true,\r\n    "resolveJsonModule": true,\r\n    "declaration": true,\r\n    "declarationMap": true,\r\n    "sourceMap": true,\r\n    "removeComments": true,\r\n    "noImplicitAny": true,\r\n    "strictNullChecks": true,\r\n    "strictFunctionTypes": true,\r\n    "noImplicitThis": true,\r\n    "noImplicitReturns": true,\r\n    "noFallthroughCasesInSwitch": true,\r\n    "moduleResolution": "node",\r\n    "baseUrl": "./",\r\n    "paths": {\r\n      "@/*": ["src/*"],\r\n      "@prisma/*": ["prisma/*"]\r\n    }\r\n  },\r\n  "include": [\r\n    "src/**/*",\r\n    "prisma/**/*"\r\n  ],\r\n  "exclude": [\r\n    "node_modules",\r\n    "dist"\r\n  ]\r\n}
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitThis": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "moduleResolution": "node",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@prisma/*": ["prisma/*"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "prisma/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
