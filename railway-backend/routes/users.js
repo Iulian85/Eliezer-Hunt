@@ -163,5 +163,76 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Telegram authentication and user creation/update
+router.post('/telegram-auth', async (req, res) => {
+  try {
+    const { telegramUser, deviceFingerprint } = req.body;
+
+    if (!telegramUser) {
+      return res.status(400).json({ error: 'Telegram user data is required' });
+    }
+
+    const {
+      id: telegram_id,
+      username,
+      first_name,
+      last_name,
+      photo_url,
+      auth_date,
+      hash
+    } = telegramUser;
+
+    // Combine first name and last name for full name
+    const fullName = last_name ? `${first_name} ${last_name}` : first_name;
+
+    // Check if user already exists
+    const existingUserQuery = 'SELECT * FROM users WHERE telegram_id = $1';
+    const existingUserResult = await db.query(existingUserQuery, [telegram_id]);
+
+    if (existingUserResult.rows.length > 0) {
+      // Update existing user with new information
+      const updateQuery = `
+        UPDATE users SET
+          username = COALESCE($1, username),
+          photo_url = COALESCE($2, photo_url),
+          device_fingerprint = COALESCE($3, device_fingerprint),
+          last_active = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE telegram_id = $4
+        RETURNING *;
+      `;
+
+      const result = await db.query(updateQuery, [
+        username || fullName,  // Use full name if username is not available
+        photo_url,
+        deviceFingerprint,
+        telegram_id
+      ]);
+
+      res.json({ user: result.rows[0], isNew: false });
+    } else {
+      // Create new user
+      const insertQuery = `
+        INSERT INTO users (
+          telegram_id, username, photo_url, device_fingerprint
+        ) VALUES ($1, $2, $3, $4)
+        RETURNING *;
+      `;
+
+      const result = await db.query(insertQuery, [
+        telegram_id,
+        username || fullName,  // Use full name if username is not available
+        photo_url,
+        deviceFingerprint
+      ]);
+
+      res.status(201).json({ user: result.rows[0], isNew: true });
+    }
+  } catch (error) {
+    console.error('Error processing Telegram authentication:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
   return router;
 };
