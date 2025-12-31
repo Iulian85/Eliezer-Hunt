@@ -10,11 +10,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Database connection
 const db = new Client({
-  host: process.env.PGHOST || 'localhost',
-  port: process.env.PGPORT || 5432,
-  database: process.env.PGDATABASE || 'elzr_hunt',
-  user: process.env.PGUSER || 'postgres',
-  password: process.env.PGPASSWORD || 'password',
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  },
 });
 
 // Function to run migrations
