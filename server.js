@@ -9,13 +9,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-const usersRouter = require('./routes/users');
-const claimsRouter = require('./routes/claims');
-const campaignsRouter = require('./routes/campaigns');
-const hotspotsRouter = require('./routes/hotspots');
-const withdrawalsRouter = require('./routes/withdrawals');
-const adminRouter = require('./routes/admin');
-const aiRouter = require('./routes/ai');
+const usersRouter = require('./railway-backend/routes/users');
+const claimsRouter = require('./railway-backend/routes/claims');
+const campaignsRouter = require('./railway-backend/routes/campaigns');
+const hotspotsRouter = require('./railway-backend/routes/hotspots');
+const withdrawalsRouter = require('./railway-backend/routes/withdrawals');
+const adminRouter = require('./railway-backend/routes/admin');
+const aiRouter = require('./railway-backend/routes/ai');
 
 // API routes
 app.use('/api/users', usersRouter);
