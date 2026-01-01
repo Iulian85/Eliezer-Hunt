@@ -1,24 +1,10 @@
 const express = require('express');
 const port = 3000
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
+const prisma = require('./lib/prisma');
 require('dotenv').config();
 
 const app = express();
-
-// Create a PostgreSQL connection pool
-const pgPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
-// Create Prisma adapter
-const adapter = new PrismaPg(pgPool);
-const prisma = new PrismaClient({ adapter });
 
 // Middleware
 app.use(express.json());
