@@ -104,7 +104,7 @@ function App() {
     }, []);
 
     const isAdmin = useMemo(() => {
-        return userWalletAddress && userWalletAddress === adminWalletAddress;
+        return Boolean(userWalletAddress && userWalletAddress === adminWalletAddress);
     }, [userWalletAddress, adminWalletAddress]);
 
     // Funcție pentru verificarea securității dispozitivului
