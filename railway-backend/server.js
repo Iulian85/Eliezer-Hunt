@@ -1,3 +1,10 @@
+console.log('🚀 Starting server.js...');
+console.log('📁 Current directory:', __dirname);
+console.log('📦 Node version:', process.version);
+console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
+console.log('🌐 PORT:', process.env.PORT);
+console.log('🗄️ DATABASE_PUBLIC_URL:', process.env.DATABASE_PUBLIC_URL ? 'Set' : 'Not set');
+
 const express = require('express');
 const { Pool } = require('pg'); // Folosește Pool în loc de Client
 require('dotenv').config();
