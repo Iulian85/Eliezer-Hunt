@@ -1,0 +1,847 @@
+1:const express = require('express');
+2:const { Client } = require('pg');
+3:const crypto = require('crypto');
+4:require('dotenv').config();
+5:
+6:const app = express();
+7:
+8:// Middleware
+9:app.use(express.json());
+10:app.use(express.urlencoded({ extended: true }));
+11:
+12:// CORS middleware
+13:app.use((req, res, next) => {
+14:  res.header('Access-Control-Allow-Origin', '*');
+15:  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+16:  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+17:  if (req.method === 'OPTIONS') {
+18:    res.sendStatus(200);
+19:  } else {
+20:    next();
+21:  }
+22:});
+23:
+24:// Database connection
+25:const db = new Client({
+26:  connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
+27:  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+28:});
+29:
+30:// Connect to database
+31:db.connect();
+32:
+33:// Telegram authentication verification
+34:function verifyTelegramData(initData) {
+35:  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+36:  if (!BOT_TOKEN) {
+37:    console.error('TELEGRAM_BOT_TOKEN is not set in environment variables');
+38:    return null;
+39:  }
+40:
+41:  try {
+42:    const params = new URLSearchParams(initData);
+43:    const hash = params.get('hash');
+44:    if (!hash) {
+45:      console.error('No hash found in Telegram init data');
+46:      return null;
+47:    }
+48:
+49:    params.delete('hash');
+50:
+51:    const dataCheckString = Array.from(params.entries())
+52:      .sort(([a], [b]) => a.localeCompare(b))
+53:      .map(([key, value]) => `${key}=${value}`)
+54:      .join('\n');
+55:
+56:    const secretKey = crypto.createHmac('sha256', 'WebAppData')
+57:      .update(BOT_TOKEN)
+58:      .digest();
+59:
+60:    const computedHash = crypto.createHmac('sha256', secretKey)
+61:      .update(dataCheckString)
+62:      .digest('hex');
+63:
+64:    if (computedHash !== hash) {
+65:      console.error('Telegram auth hash verification failed');
+66:      return null;
+67:    }
+68:
+69:    const userParam = params.get('user');
+70:    if (!userParam) {
+71:      console.error('No user parameter found in Telegram init data');
+72:      return null;
+73:    }
+74:
+75:    return JSON.parse(decodeURIComponent(userParam));
+76:  } catch (error) {
+77:    console.error('Telegram verification error:', error);
+78:    return null;
+79:  }
+80:}
+81:
+82:// Rate limiting storage
+83:const rateLimits = new Map();
+84:
+85:// Check rate limit for a user and action
+86:function checkRateLimit(userId, action, maxRequests = 10, windowMs = 60000) {
+87:  const key = `${userId}:${action}`;
+88:  const now = Date.now();
+89:  const windowStart = now - windowMs;
+90:
+91:  const limit = rateLimits.get(key);
+92:
+93:  if (!limit || limit.windowStart < windowStart) {
+94:    // Reset the rate limit
+95:    rateLimits.set(key, { count: 1, windowStart: now });
+96:    return true;
+97:  }
+98:
+99:  if (limit.count >= maxRequests) {
+100:    return false; // Rate limit exceeded
+101:  }
+102:
+103:  // Increment the count
+104:  rateLimits.set(key, { count: limit.count + 1, windowStart: now });
+105:  return true;
+106:}
+107:
+108:// API Routes
+109:const usersRouter = require('./routes/users')(db);
+110:const claimsRouter = require('./routes/claims')(db);
+111:const campaignsRouter = require('./routes/campaigns')(db);
+112:const hotspotsRouter = require('./routes/hotspots')(db);
+113:const withdrawalsRouter = require('./routes/withdrawals')(db);
+114:const adminRouter = require('./routes/admin')(db);
+115:const aiRouter = require('./routes/ai')(db);
+116:
+117:// API routes
+118:app.use('/api/users', usersRouter);
+119:app.use('/api/claims', claimsRouter);
+120:app.use('/api/campaigns', campaignsRouter);
+121:app.use('/api/hotspots', hotspotsRouter);
+122:app.use('/api/withdrawals', withdrawalsRouter);
+123:app.use('/api/admin', adminRouter);
+124:app.use('/api/ai', aiRouter);
+125:
+126:// New endpoints as required by the prompt
+127:// /api/sync-user (POST) - Creates/updates users with Telegram auth and fingerprint
+128:app.post('/api/sync-user', async (req, res) => {
+129:  try {
+130:    const { telegramInitData, fingerprint } = req.body;
+131:
+132:    // Verify Telegram authentication
+133:    const telegramUser = verifyTelegramData(telegramInitData);
+134:    if (!telegramUser) {
+135:      return res.status(401).json({ success: false, error: 'Invalid Telegram auth' });
+136:    }
+137:
+138:    const telegramId = telegramUser.id;
+139:
+140:    // Check rate limit
+141:    if (!checkRateLimit(telegramId.toString(), 'sync-user')) {
+142:      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+143:    }
+144:
+145:    // Check if user exists
+146:    const existingUserQuery = 'SELECT * FROM users WHERE telegram_id = $1';
+147:    const existingUserResult = await db.query(existingUserQuery, [telegramId]);
+148:
+149:    if (existingUserResult.rows.length > 0) {
+150:      // Update existing user
+151:      const updateQuery = `
+152:        UPDATE users SET
+153:          username = COALESCE($2, username),
+154:          first_name = COALESCE($3, first_name),
+155:          last_name = COALESCE($4, last_name),
+156:          photo_url = COALESCE($5, photo_url),
+157:          device_fingerprint = COALESCE($6, device_fingerprint),
+158:          last_active = CURRENT_TIMESTAMP,
+159:          updated_at = CURRENT_TIMESTAMP
+160:        WHERE telegram_id = $1
+161:        RETURNING *;
+162:      `;
+163:
+164:      const result = await db.query(updateQuery, [
+165:        telegramId,
+166:        telegramUser.username,
+167:        telegramUser.first_name,
+168:        telegramUser.last_name,
+169:        telegramUser.photo_url,
+170:        fingerprint
+171:      ]);
+172:
+173:      return res.json({ success: true, user: result.rows[0] });
+174:    } else {
+175:      // Create new user
+176:      const insertQuery = `
+177:        INSERT INTO users (
+178:          telegram_id, username, first_name, last_name,
+179:          photo_url, device_fingerprint
+180:        ) VALUES ($1, $2, $3, $4, $5, $6)
+181:        RETURNING *;
+182:      `;
+183:
+184:      const result = await db.query(insertQuery, [
+185:        telegramId,
+186:        telegramUser.username,
+187:        telegramUser.first_name,
+188:        telegramUser.last_name,
+189:        telegramUser.photo_url,
+190:        fingerprint
+191:      ]);
+192:
+193:      return res.status(201).json({ success: true, user: result.rows[0] });
+194:    }
+195:
+196:  } catch (error) {
+197:    console.error('Sync user error:', error);
+198:    res.status(500).json({ success: false, error: 'Internal server error' });
+199:  }
+200:});
+201:
+202:// /api/collect (POST) - Saves collections and updates balances
+203:app.post('/api/collect', async (req, res) => {
+204:  try {
+205:    const { telegramInitData, spawnId, value, category, tonReward, location } = req.body;
+206:
+207:    // Verify Telegram authentication
+208:    const telegramUser = verifyTelegramData(telegramInitData);
+209:    if (!telegramUser) {
+210:      return res.status(401).json({ success: false, error: 'Invalid Telegram auth' });
+211:    }
+212:
+213:    const telegramId = telegramUser.id;
+214:
+215:    // Check rate limit
+216:    if (!checkRateLimit(telegramId.toString(), 'collect')) {
+217:      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+218:    }
+219:
+220:    // Check if collection already exists (except for ads)
+221:    if (!spawnId.startsWith("ad-")) {
+222:      const existingCollectionQuery = 'SELECT * FROM claims WHERE user_id = (SELECT id FROM users WHERE telegram_id = $1) AND spawn_id = $2';
+223:      const existingCollectionResult = await db.query(existingCollectionQuery, [telegramId, spawnId]);
+224:
+225:      if (existingCollectionResult.rows.length > 0) {
+226:        return res.status(400).json({ success: false, error: 'Item already collected' });
+227:      }
+228:    }
+229:
+230:    // Get user ID from telegram_id
+231:    const userQuery = 'SELECT id FROM users WHERE telegram_id = $1';
+232:    const userResult = await db.query(userQuery, [telegramId]);
+233:
+234:    if (userResult.rows.length === 0) {
+235:      return res.status(404).json({ success: false, error: 'User not found' });
+236:    }
+237:
+238:    const userId = userResult.rows[0].id;
+239:
+240:    // Insert collection record
+241:    const insertClaimQuery = `
+242:      INSERT INTO claims (
+243:        user_id, spawn_id, category, claimed_value, ton_reward
+244:      ) VALUES ($1, $2, $3, $4, $5)
+245:      RETURNING *;
+246:    `;
+247:
+248:    await db.query(insertClaimQuery, [userId, spawnId, category, value, tonReward]);
+249:
+250:    // Update user balance based on category
+251:    let updateField = 'gameplay_balance';
+252:    if (category === 'AD_REWARD') {
+253:      updateField = 'daily_supply_balance';
+254:    } else if (category === 'LANDMARK') {
+255:      updateField = 'rare_balance';
+256:    } else if (category === 'EVENT') {
+257:      updateField = 'event_balance';
+258:    } else if (category === 'MERCHANT') {
+259:      updateField = 'merchant_balance';
+260:    } else if (category === 'GIFTBOX') {
+261:      updateField = 'gameplay_balance';
+262:    }
+263:
+264:    // Update user balance and collected IDs
+265:    const updateUserQuery = `
+266:      UPDATE users SET
+267:        ${updateField} = ${updateField} + $1,
+268:        balance = balance + $1,
+269:        ton_balance = ton_balance + $2,
+270:        last_active = CURRENT_TIMESTAMP
+271:      WHERE telegram_id = $3
+272:    `;
+273:
+274:    await db.query(updateUserQuery, [value, tonReward, telegramId]);
+275:
+276:    // Update counters based on category
+277:    if (category === 'LANDMARK') {
+278:      await db.query(
+279:        'UPDATE users SET rare_items_collected = rare_items_collected + 1 WHERE telegram_id = $1',
+280:        [telegramId]
+281:      );
+282:    } else if (category === 'EVENT') {
+283:      await db.query(
+284:        'UPDATE users SET event_items_collected = event_items_collected + 1 WHERE telegram_id = $1',
+285:        [telegramId]
+286:      );
+287:    } else if (category === 'AD_REWARD') {
+288:      await db.query(
+289:        'UPDATE users SET ads_watched = ads_watched + 1, last_ad_watch = CURRENT_TIMESTAMP WHERE telegram_id = $1',
+290:        [telegramId]
+291:      );
+292:    } else if (category === 'MERCHANT') {
+293:      await db.query(
+294:        'UPDATE users SET sponsored_ads_watched = sponsored_ads_watched + 1 WHERE telegram_id = $1',
+295:        [telegramId]
+296:      );
+297:    }
+298:
+299:    res.json({ success: true, message: 'Collection saved successfully' });
+300:
+301:  } catch (error) {
+302:    console.error('Collect error:', error);
+303:    res.status(500).json({ success: false, error: 'Internal server error' });
+304:  }
+305:});
+306:
+307:// /api/update-wallet (POST) - Updates wallet addresses with validation
+308:app.post('/api/update-wallet', async (req, res) => {
+309:  try {
+310:    const { telegramInitData, walletAddress } = req.body;
+311:
+312:    // Verify Telegram authentication
+313:    const telegramUser = verifyTelegramData(telegramInitData);
+314:    if (!telegramUser) {
+315:      return res.status(401).json({ success: false, error: 'Invalid Telegram auth' });
+316:    }
+317:
+318:    const telegramId = telegramUser.id;
+319:
+320:    // Check rate limit
+321:    if (!checkRateLimit(telegramId.toString(), 'update-wallet')) {
+322:      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+323:    }
+324:
+325:    // Validate wallet address format (basic validation)
+326:    if (!walletAddress || typeof walletAddress !== 'string' || walletAddress.length < 10) {
+327:      return res.status(400).json({ success: false, error: 'Invalid wallet address format' });
+328:    }
+329:
+330:    // Update user wallet address
+331:    const updateQuery = `
+332:      UPDATE users SET
+333:        wallet_address = $1,
+334:        updated_at = CURRENT_TIMESTAMP
+335:      WHERE telegram_id = $2
+336:      RETURNING *;
+337:    `;
+338:
+339:    const result = await db.query(updateQuery, [walletAddress, telegramId]);
+340:
+341:    if (result.rows.length === 0) {
+342:      return res.status(404).json({ success: false, error: 'User not found' });
+343:    }
+344:
+345:    res.json({ success: true, message: 'Wallet updated successfully', user: result.rows[0] });
+346:
+347:  } catch (error) {
+348:    console.error('Update wallet error:', error);
+349:    res.status(500).json({ success: false, error: 'Internal server error' });
+350:  }
+351:});
+352:
+353:// /api/get-user (GET) - Returns user data by Telegram ID
+354:app.get('/api/get-user', async (req, res) => {
+355:  try {
+356:    const telegramId = req.query.telegramId;
+357:
+358:    if (!telegramId) {
+359:      return res.status(400).json({ success: false, error: 'Telegram ID is required' });
+360:    }
+361:
+362:    // Check rate limit
+363:    if (!checkRateLimit(telegramId, 'get-user')) {
+364:      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+365:    }
+366:
+367:    const query = 'SELECT * FROM users WHERE telegram_id = $1';
+368:    const result = await db.query(query, [telegramId]);
+369:
+370:    if (result.rows.length === 0) {
+371:      return res.status(404).json({ success: false, error: 'User not found' });
+372:    }
+373:
+374:    res.json({ success: true, user: result.rows[0] });
+375:
+376:  } catch (error) {
+377:    console.error('Get user error:', error);
+378:    res.status(500).json({ success: false, error: 'Internal server error' });
+379:  }
+380:});
+381:
+382:// /api/get-leaderboard (GET) - Returns top 50 users by balance
+383:app.get('/api/get-leaderboard', async (req, res) => {
+384:  try {
+385:    // Check rate limit
+386:    if (!checkRateLimit('leaderboard', 'get-leaderboard')) {
+387:      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+388:    }
+389:
+390:    const query = `
+391:      SELECT
+392:        telegram_id,
+393:        username,
+394:        first_name,
+395:        last_name,
+396:        photo_url,
+397:        balance,
+398:        ton_balance,
+399:        gameplay_balance,
+400:        rare_balance,
+401:        event_balance,
+402:        daily_supply_balance,
+403:        merchant_balance,
+404:        referral_balance
+405:      FROM users
+406:      WHERE is_banned = FALSE
+407:      ORDER BY balance DESC
+408:      LIMIT 50
+409:    `;
+410:
+411:    const result = await db.query(query);
+412:
+413:    res.json({ success: true, leaderboard: result.rows });
+414:
+415:  } catch (error) {
+416:    console.error('Get leaderboard error:', error);
+417:    res.status(500).json({ success: false, error: 'Internal server error' });
+418:  }
+419:});
+420:
+421:// Basic route
+422:app.get('/', (req, res) => {
+423:  res.json({ message: 'ELZR Hunt Railway Backend API' });
+424:});
+425:
+426:// Error handling middleware
+427:app.use((err, req, res, next) => {
+428:  console.error(err.stack);
+429:  res.status(500).json({ error: 'Something went wrong!' });
+430:});
+431:
+432:// Function to run migrations
+433:async function runMigrations() {
+434:  let migrationDb;
+435:  try {
+436:    console.log('Starting migration process...');
+437:    const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+438:    if (!connectionString) {
+439:      console.warn('No database connection string. Skipping migrations.');
+440:      return;
+441:    }
+442:
+443:    migrationDb = new Client({
+444:      connectionString,
+445:      ssl: { rejectUnauthorized: false },
+446:    });
+447:
+448:    await migrationDb.connect();
+449:    console.log('Connected to database for migrations');
+450:
+451:    // Creează tabelele direct în cod (adaptează la schema ta exactă)
+452:    await migrationDb.query(`
+453:      CREATE TABLE IF NOT EXISTS users (
+454:        id SERIAL PRIMARY KEY,
+455:        telegram_id BIGINT UNIQUE NOT NULL,
+456:        username VARCHAR(255),
+457:        photo_url TEXT,
+458:        device_fingerprint VARCHAR(255),
+459:        joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+460:        last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+461:        balance BIGINT DEFAULT 0,
+462:        ton_balance BIGINT DEFAULT 0,
+463:        gameplay_balance BIGINT DEFAULT 0,
+464:        rare_balance BIGINT DEFAULT 0,
+465:        event_balance BIGINT DEFAULT 0,
+466:        daily_supply_balance BIGINT DEFAULT 0,
+467:        merchant_balance BIGINT DEFAULT 0,
+468:        referral_balance BIGINT DEFAULT 0,
+469:        collected_ids TEXT[] DEFAULT '{}',
+470:        biometric_enabled BOOLEAN DEFAULT true,
+471:        is_banned BOOLEAN DEFAULT false,
+472:        wallet_address VARCHAR(255),
+473:        referrals INTEGER DEFAULT 0,
+474:        referral_names TEXT[] DEFAULT '{}',
+475:        has_claimed_referral BOOLEAN DEFAULT false,
+476:        last_ad_watch BIGINT DEFAULT 0,
+477:        last_daily_claim BIGINT DEFAULT 0,
+478:        ads_watched INTEGER DEFAULT 0,
+479:        sponsored_ads_watched INTEGER DEFAULT 0,
+480:        rare_items_collected INTEGER DEFAULT 0,
+481:        event_items_collected INTEGER DEFAULT 0,
+482:        last_init_data TEXT,
+483:        screenshot_lock BOOLEAN DEFAULT false,
+484:        is_airdropped BOOLEAN DEFAULT false,
+485:        airdrop_allocation BIGINT DEFAULT 0,
+486:        airdrop_timestamp TIMESTAMP WITH TIME ZONE,
+487:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+488:        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+489:      );
+490:
+491:      -- Function to update updated_at timestamp
+492:      CREATE OR REPLACE FUNCTION update_updated_at_column()
+493:      RETURNS TRIGGER AS $$
+494:      BEGIN
+495:          NEW.updated_at = CURRENT_TIMESTAMP;
+496:          RETURN NEW;
+497:      END;
+498:      $$ language 'plpgsql';
+499:
+500:      -- Trigger to update updated_at for users table
+501:      CREATE TRIGGER update_users_updated_at
+502:          BEFORE UPDATE ON users
+503:          FOR EACH ROW
+504:          EXECUTE FUNCTION update_updated_at_column();
+505:
+506:      CREATE TABLE IF NOT EXISTS claims (
+507:        id SERIAL PRIMARY KEY,
+508:        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+509:        spawn_id VARCHAR(255) NOT NULL,
+510:        category VARCHAR(50),
+511:        claimed_value BIGINT DEFAULT 0,
+512:        ton_reward BIGINT DEFAULT 0,
+513:        status VARCHAR(50) DEFAULT 'pending',
+514:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+515:      );
+516:
+517:      -- Index for claims table
+518:      CREATE INDEX IF NOT EXISTS idx_claims_user_id ON claims(user_id);
+519:      CREATE INDEX IF NOT EXISTS idx_claims_spawn_id ON claims(spawn_id);
+520:
+521:      CREATE TABLE IF NOT EXISTS campaigns (
+522:        id SERIAL PRIMARY KEY,
+523:        owner_wallet VARCHAR(255) NOT NULL,
+524:        target_lat DECIMAL(10, 8) NOT NULL,
+525:        target_lng DECIMAL(11, 8) NOT NULL,
+526:        count INTEGER DEFAULT 1,
+527:        multiplier INTEGER DEFAULT 1,
+528:        duration_days INTEGER DEFAULT 1,
+529:        expiry_date BIGINT,
+530:        total_price BIGINT DEFAULT 0,
+531:        brand_name VARCHAR(255),
+532:        logo_url TEXT,
+533:        video_url TEXT,
+534:        video_file_name TEXT,
+535:        contact_street VARCHAR(255),
+536:        contact_city VARCHAR(255),
+537:        contact_zip VARCHAR(50),
+538:        contact_country VARCHAR(100),
+539:        contact_phone VARCHAR(50),
+540:        contact_email VARCHAR(255),
+541:        contact_website VARCHAR(255),
+542:        status VARCHAR(50) DEFAULT 'pending_review',
+543:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+544:        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+545:      );
+546:
+547:      -- Trigger to update updated_at for campaigns table
+548:      CREATE TRIGGER update_campaigns_updated_at
+549:          BEFORE UPDATE ON campaigns
+550:          FOR EACH ROW
+551:          EXECUTE FUNCTION update_updated_at_column();
+552:
+553:      CREATE TABLE IF NOT EXISTS hotspots (
+554:        id VARCHAR(255) PRIMARY KEY,
+555:        name VARCHAR(255) NOT NULL,
+556:        lat DECIMAL(10, 8) NOT NULL,
+557:        lng DECIMAL(11, 8) NOT NULL,
+558:        radius INTEGER DEFAULT 100,
+559:        density INTEGER DEFAULT 10,
+560:        category VARCHAR(50),
+561:        base_value BIGINT DEFAULT 100,
+562:        logo_url TEXT,
+563:        custom_text VARCHAR(100),
+564:        prizes TEXT, -- JSON array of numbers as text
+565:        video_url TEXT,
+566:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+567:        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+568:      );
+569:
+570:      -- Trigger to update updated_at for hotspots table
+571:      CREATE TRIGGER update_hotspots_updated_at
+572:          BEFORE UPDATE ON hotspots
+573:          FOR EACH ROW
+574:          EXECUTE FUNCTION update_updated_at_column();
+575:
+576:      CREATE TABLE IF NOT EXISTS withdrawal_requests (
+577:        id SERIAL PRIMARY KEY,
+578:        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+579:        amount BIGINT NOT NULL,
+580:        status VARCHAR(50) DEFAULT 'pending',
+581:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+582:        processed_at TIMESTAMP WITH TIME ZONE
+583:      );
+584:
+585:      -- Index for withdrawal_requests table
+586:      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user_id ON withdrawal_requests(user_id);
+587:      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status ON withdrawal_requests(status);
+588:
+589:      -- Rate limits table (for API rate limiting)
+590:      CREATE TABLE IF NOT EXISTS rate_limits (
+591:        id SERIAL PRIMARY KEY,
+592:        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+593:        action VARCHAR(100) NOT NULL,
+594:        count INTEGER DEFAULT 1,
+595:        window_start TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+596:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+597:      );
+598:
+599:      -- Index for rate_limits table
+600:      CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action ON rate_limits(user_id, action);
+601:
+602:      -- Indexes for performance
+603:      CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
+604:      CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
+605:      CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
+606:      CREATE INDEX IF NOT EXISTS idx_claims_created_at ON claims(created_at);
+607:      CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at);
+608:      CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
+609:      CREATE INDEX IF NOT EXISTS idx_campaigns_owner_wallet ON campaigns(owner_wallet);
+610:    `);
+611:
+612:    console.log('Migration completed successfully');
+613:  } catch (error) {
+614:    console.error('Migration failed (server will continue):', error.message);
+615:    // Server-ul continuă chiar dacă migrarea eșuează
+616:  } finally {
+617:    if (migrationDb) await migrationDb.end();
+618:  }
+619:}
+620:
+621:// Run migrations first, then start the server
+622:async function startServer() {
+623:  // Run migrations but don't stop server if they fail
+624:  await runMigrations();
+625:
+626:  // Start server
+627:  const PORT = process.env.PORT || 5174;
+628:  app.listen(PORT, () => {
+629:    console.log(`Server is running on port ${PORT}`);
+630:  });
+631:}
+632:
+633:startServer();
+634:
+635:module.exports = app;
+636:
+637:
+638:// Function to run migrations
+639:async function runMigrations() {
+640:  let migrationDb;
+641:  try {
+642:    console.log('Starting migration process...');
+643:    const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+644:    if (!connectionString) {
+645:      console.warn('No database connection string. Skipping migrations.');
+646:      return;
+647:    }
+648:
+649:    migrationDb = new Client({
+650:      connectionString,
+651:      ssl: { rejectUnauthorized: false },
+652:    });
+653:
+654:    await migrationDb.connect();
+655:    console.log('Connected to database for migrations');
+656:
+657:    // Creează tabelele direct în cod (adaptează la schema ta exactă)
+658:    await migrationDb.query(`
+659:      CREATE TABLE IF NOT EXISTS users (
+660:        id SERIAL PRIMARY KEY,
+661:        telegram_id BIGINT UNIQUE NOT NULL,
+662:        username VARCHAR(255),
+663:        photo_url TEXT,
+664:        device_fingerprint VARCHAR(255),
+665:        joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+666:        last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+667:        balance BIGINT DEFAULT 0,
+668:        ton_balance BIGINT DEFAULT 0,
+669:        gameplay_balance BIGINT DEFAULT 0,
+670:        rare_balance BIGINT DEFAULT 0,
+671:        event_balance BIGINT DEFAULT 0,
+672:        daily_supply_balance BIGINT DEFAULT 0,
+673:        merchant_balance BIGINT DEFAULT 0,
+674:        referral_balance BIGINT DEFAULT 0,
+675:        collected_ids TEXT[] DEFAULT '{}',
+676:        biometric_enabled BOOLEAN DEFAULT true,
+677:        is_banned BOOLEAN DEFAULT false,
+678:        wallet_address VARCHAR(255),
+679:        referrals INTEGER DEFAULT 0,
+680:        referral_names TEXT[] DEFAULT '{}',
+681:        has_claimed_referral BOOLEAN DEFAULT false,
+682:        last_ad_watch BIGINT DEFAULT 0,
+683:        last_daily_claim BIGINT DEFAULT 0,
+684:        ads_watched INTEGER DEFAULT 0,
+685:        sponsored_ads_watched INTEGER DEFAULT 0,
+686:        rare_items_collected INTEGER DEFAULT 0,
+687:        event_items_collected INTEGER DEFAULT 0,
+688:        last_init_data TEXT,
+689:        screenshot_lock BOOLEAN DEFAULT false,
+690:        is_airdropped BOOLEAN DEFAULT false,
+691:        airdrop_allocation BIGINT DEFAULT 0,
+692:        airdrop_timestamp TIMESTAMP WITH TIME ZONE,
+693:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+694:        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+695:      );
+696:
+697:      -- Function to update updated_at timestamp
+698:      CREATE OR REPLACE FUNCTION update_updated_at_column()
+699:      RETURNS TRIGGER AS $$
+700:      BEGIN
+701:          NEW.updated_at = CURRENT_TIMESTAMP;
+702:          RETURN NEW;
+703:      END;
+704:      $$ language 'plpgsql';
+705:
+706:      -- Trigger to update updated_at for users table
+707:      CREATE TRIGGER update_users_updated_at
+708:          BEFORE UPDATE ON users
+709:          FOR EACH ROW
+710:          EXECUTE FUNCTION update_updated_at_column();
+711:
+712:      CREATE TABLE IF NOT EXISTS claims (
+713:        id SERIAL PRIMARY KEY,
+714:        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+715:        spawn_id VARCHAR(255) NOT NULL,
+716:        category VARCHAR(50),
+717:        claimed_value BIGINT DEFAULT 0,
+718:        ton_reward BIGINT DEFAULT 0,
+719:        status VARCHAR(50) DEFAULT 'pending',
+720:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+721:      );
+722:
+723:      -- Index for claims table
+724:      CREATE INDEX IF NOT EXISTS idx_claims_user_id ON claims(user_id);
+725:      CREATE INDEX IF NOT EXISTS idx_claims_spawn_id ON claims(spawn_id);
+726:
+727:      CREATE TABLE IF NOT EXISTS campaigns (
+728:        id SERIAL PRIMARY KEY,
+729:        owner_wallet VARCHAR(255) NOT NULL,
+730:        target_lat DECIMAL(10, 8) NOT NULL,
+731:        target_lng DECIMAL(11, 8) NOT NULL,
+732:        count INTEGER DEFAULT 1,
+733:        multiplier INTEGER DEFAULT 1,
+734:        duration_days INTEGER DEFAULT 1,
+735:        expiry_date BIGINT,
+736:        total_price BIGINT DEFAULT 0,
+737:        brand_name VARCHAR(255),
+738:        logo_url TEXT,
+739:        video_url TEXT,
+740:        video_file_name TEXT,
+741:        contact_street VARCHAR(255),
+742:        contact_city VARCHAR(255),
+743:        contact_zip VARCHAR(50),
+744:        contact_country VARCHAR(100),
+745:        contact_phone VARCHAR(50),
+746:        contact_email VARCHAR(255),
+747:        contact_website VARCHAR(255),
+748:        status VARCHAR(50) DEFAULT 'pending_review',
+749:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+750:        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+751:      );
+752:
+753:      -- Trigger to update updated_at for campaigns table
+754:      CREATE TRIGGER update_campaigns_updated_at
+755:          BEFORE UPDATE ON campaigns
+756:          FOR EACH ROW
+757:          EXECUTE FUNCTION update_updated_at_column();
+758:
+759:      CREATE TABLE IF NOT EXISTS hotspots (
+760:        id VARCHAR(255) PRIMARY KEY,
+761:        name VARCHAR(255) NOT NULL,
+762:        lat DECIMAL(10, 8) NOT NULL,
+763:        lng DECIMAL(11, 8) NOT NULL,
+764:        radius INTEGER DEFAULT 100,
+765:        density INTEGER DEFAULT 10,
+766:        category VARCHAR(50),
+767:        base_value BIGINT DEFAULT 100,
+768:        logo_url TEXT,
+769:        custom_text VARCHAR(100),
+770:        prizes TEXT, -- JSON array of numbers as text
+771:        video_url TEXT,
+772:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+773:        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+774:      );
+775:
+776:      -- Trigger to update updated_at for hotspots table
+777:      CREATE TRIGGER update_hotspots_updated_at
+778:          BEFORE UPDATE ON hotspots
+779:          FOR EACH ROW
+780:          EXECUTE FUNCTION update_updated_at_column();
+781:
+782:      CREATE TABLE IF NOT EXISTS withdrawal_requests (
+783:        id SERIAL PRIMARY KEY,
+784:        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+785:        amount BIGINT NOT NULL,
+786:        status VARCHAR(50) DEFAULT 'pending',
+787:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+788:        processed_at TIMESTAMP WITH TIME ZONE
+789:      );
+790:
+791:      -- Index for withdrawal_requests table
+792:      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user_id ON withdrawal_requests(user_id);
+793:      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status ON withdrawal_requests(status);
+794:
+795:      -- Rate limits table (for API rate limiting)
+796:      CREATE TABLE IF NOT EXISTS rate_limits (
+797:        id SERIAL PRIMARY KEY,
+798:        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+799:        action VARCHAR(100) NOT NULL,
+800:        count INTEGER DEFAULT 1,
+801:        window_start TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+802:        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+803:      );
+804:
+805:      -- Index for rate_limits table
+806:      CREATE INDEX IF NOT EXISTS idx_rate_limits_user_action ON rate_limits(user_id, action);
+807:
+808:      -- Indexes for performance
+809:      CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
+810:      CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
+811:      CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
+812:      CREATE INDEX IF NOT EXISTS idx_claims_created_at ON claims(created_at);
+813:      CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at);
+814:      CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
+815:      CREATE INDEX IF NOT EXISTS idx_campaigns_owner_wallet ON campaigns(owner_wallet);
+816:    `);
+817:
+818:    console.log('Migration completed successfully');
+819:  } catch (error) {
+820:    console.error('Migration failed (server will continue):', error.message);
+821:    // Server-ul continuă chiar dacă migrarea eșuează
+822:  } finally {
+823:    if (migrationDb) await migrationDb.end();
+824:  }
+825:}
+826:
+827:// Run migrations first, then start the server
+828:async function startServer() {
+829:  // Run migrations but don't stop server if they fail
+830:  await runMigrations();
+831:
+832:  // Error handling middleware
+833:  app.use((err, req, res, next) => {
+834:    console.error(err.stack);
+835:    res.status(500).json({ error: 'Something went wrong!' });
+836:  });
+837:
+838:  // Start server
+839:  const PORT = process.env.PORT || 5174;
+840:  app.listen(PORT, () => {
+841:    console.log(`Server is running on port ${PORT}`);
+842:  });
+843:}
+844:
+845:startServer();
+846:
+847:module.exports = app;

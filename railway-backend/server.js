@@ -1,5 +1,6 @@
 const express = require('express');
 const { Client } = require('pg');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
@@ -7,6 +8,18 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
 
 // Database connection
 const db = new Client({
@@ -17,7 +30,82 @@ const db = new Client({
 // Connect to database
 db.connect();
 
-// Routes - pass the database connection
+// Telegram authentication verification
+function verifyTelegramData(initData) {
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  if (!BOT_TOKEN) {
+    console.error('TELEGRAM_BOT_TOKEN is not set in environment variables');
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash) {
+      console.error('No hash found in Telegram init data');
+      return null;
+    }
+
+    params.delete('hash');
+    
+    const dataCheckString = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n');
+    
+    const secretKey = crypto.createHmac('sha256', 'WebAppData')
+      .update(BOT_TOKEN)
+      .digest();
+    
+    const computedHash = crypto.createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex');
+    
+    if (computedHash !== hash) {
+      console.error('Telegram auth hash verification failed');
+      return null;
+    }
+    
+    const userParam = params.get('user');
+    if (!userParam) {
+      console.error('No user parameter found in Telegram init data');
+      return null;
+    }
+    
+    return JSON.parse(decodeURIComponent(userParam));
+  } catch (error) {
+    console.error('Telegram verification error:', error);
+    return null;
+  }
+}
+
+// Rate limiting storage
+const rateLimits = new Map();
+
+// Check rate limit for a user and action
+function checkRateLimit(userId, action, maxRequests = 10, windowMs = 60000) {
+  const key = `${userId}:${action}`;
+  const now = Date.now();
+  const windowStart = now - windowMs;
+  
+  const limit = rateLimits.get(key);
+  
+  if (!limit || limit.windowStart < windowStart) {
+    // Reset the rate limit
+    rateLimits.set(key, { count: 1, windowStart: now });
+    return true;
+  }
+  
+  if (limit.count >= maxRequests) {
+    return false; // Rate limit exceeded
+  }
+  
+  // Increment the count
+  rateLimits.set(key, { count: limit.count + 1, windowStart: now });
+  return true;
+}
+
+// API Routes
 const usersRouter = require('./routes/users')(db);
 const claimsRouter = require('./routes/claims')(db);
 const campaignsRouter = require('./routes/campaigns')(db);
@@ -35,11 +123,311 @@ app.use('/api/withdrawals', withdrawalsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/ai', aiRouter);
 
+// New endpoints as required by the prompt
+// /api/sync-user (POST) - Creates/updates users with Telegram auth and fingerprint
+app.post('/api/sync-user', async (req, res) => {
+  try {
+    const { telegramInitData, fingerprint } = req.body;
+    
+    // Verify Telegram authentication
+    const telegramUser = verifyTelegramData(telegramInitData);
+    if (!telegramUser) {
+      return res.status(401).json({ success: false, error: 'Invalid Telegram auth' });
+    }
+
+    const telegramId = telegramUser.id;
+    
+    // Check rate limit
+    if (!checkRateLimit(telegramId.toString(), 'sync-user')) {
+      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+    }
+
+    // Check if user exists
+    const existingUserQuery = 'SELECT * FROM users WHERE telegram_id = $1';
+    const existingUserResult = await db.query(existingUserQuery, [telegramId]);
+    
+    if (existingUserResult.rows.length > 0) {
+      // Update existing user
+      const updateQuery = `
+        UPDATE users SET 
+          username = COALESCE($2, username),
+          first_name = COALESCE($3, first_name),
+          last_name = COALESCE($4, last_name),
+          photo_url = COALESCE($5, photo_url),
+          device_fingerprint = COALESCE($6, device_fingerprint),
+          last_active = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE telegram_id = $1
+        RETURNING *;
+      `;
+      
+      const result = await db.query(updateQuery, [
+        telegramId, 
+        telegramUser.username, 
+        telegramUser.first_name,
+        telegramUser.last_name, 
+        telegramUser.photo_url, 
+        fingerprint
+      ]);
+      
+      return res.json({ success: true, user: result.rows[0] });
+    } else {
+      // Create new user
+      const insertQuery = `
+        INSERT INTO users (
+          telegram_id, username, first_name, last_name, 
+          photo_url, device_fingerprint
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *;
+      `;
+      
+      const result = await db.query(insertQuery, [
+        telegramId, 
+        telegramUser.username, 
+        telegramUser.first_name,
+        telegramUser.last_name, 
+        telegramUser.photo_url, 
+        fingerprint
+      ]);
+      
+      return res.status(201).json({ success: true, user: result.rows[0] });
+    }
+    
+  } catch (error) {
+    console.error('Sync user error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// /api/collect (POST) - Saves collections and updates balances
+app.post('/api/collect', async (req, res) => {
+  try {
+    const { telegramInitData, spawnId, value, category, tonReward, location } = req.body;
+    
+    // Verify Telegram authentication
+    const telegramUser = verifyTelegramData(telegramInitData);
+    if (!telegramUser) {
+      return res.status(401).json({ success: false, error: 'Invalid Telegram auth' });
+    }
+
+    const telegramId = telegramUser.id;
+    
+    // Check rate limit
+    if (!checkRateLimit(telegramId.toString(), 'collect')) {
+      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+    }
+
+    // Check if collection already exists (except for ads)
+    if (!spawnId.startsWith("ad-")) {
+      const existingCollectionQuery = 'SELECT * FROM claims WHERE user_id = (SELECT id FROM users WHERE telegram_id = $1) AND spawn_id = $2';
+      const existingCollectionResult = await db.query(existingCollectionQuery, [telegramId, spawnId]);
+      
+      if (existingCollectionResult.rows.length > 0) {
+        return res.status(400).json({ success: false, error: 'Item already collected' });
+      }
+    }
+
+    // Get user ID from telegram_id
+    const userQuery = 'SELECT id FROM users WHERE telegram_id = $1';
+    const userResult = await db.query(userQuery, [telegramId]);
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    const userId = userResult.rows[0].id;
+
+    // Insert collection record
+    const insertClaimQuery = `
+      INSERT INTO claims (
+        user_id, spawn_id, category, claimed_value, ton_reward
+      ) VALUES ($1, $2, $3, $4, $5)
+      RETURNING *;
+    `;
+    
+    await db.query(insertClaimQuery, [userId, spawnId, category, value, tonReward]);
+
+    // Update user balance based on category
+    let updateField = 'gameplay_balance';
+    if (category === 'AD_REWARD') {
+      updateField = 'daily_supply_balance';
+    } else if (category === 'LANDMARK') {
+      updateField = 'rare_balance';
+    } else if (category === 'EVENT') {
+      updateField = 'event_balance';
+    } else if (category === 'MERCHANT') {
+      updateField = 'merchant_balance';
+    } else if (category === 'GIFTBOX') {
+      updateField = 'gameplay_balance';
+    }
+
+    // Update user balance and collected IDs
+    const updateUserQuery = `
+      UPDATE users SET 
+        ${updateField} = ${updateField} + $1,
+        balance = balance + $1,
+        ton_balance = ton_balance + $2,
+        last_active = CURRENT_TIMESTAMP
+      WHERE telegram_id = $3
+    `;
+    
+    await db.query(updateUserQuery, [value, tonReward, telegramId]);
+
+    // Update counters based on category
+    if (category === 'LANDMARK') {
+      await db.query(
+        'UPDATE users SET rare_items_collected = rare_items_collected + 1 WHERE telegram_id = $1',
+        [telegramId]
+      );
+    } else if (category === 'EVENT') {
+      await db.query(
+        'UPDATE users SET event_items_collected = event_items_collected + 1 WHERE telegram_id = $1',
+        [telegramId]
+      );
+    } else if (category === 'AD_REWARD') {
+      await db.query(
+        'UPDATE users SET ads_watched = ads_watched + 1, last_ad_watch = CURRENT_TIMESTAMP WHERE telegram_id = $1',
+        [telegramId]
+      );
+    } else if (category === 'MERCHANT') {
+      await db.query(
+        'UPDATE users SET sponsored_ads_watched = sponsored_ads_watched + 1 WHERE telegram_id = $1',
+        [telegramId]
+      );
+    }
+
+    res.json({ success: true, message: 'Collection saved successfully' });
+    
+  } catch (error) {
+    console.error('Collect error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// /api/update-wallet (POST) - Updates wallet addresses with validation
+app.post('/api/update-wallet', async (req, res) => {
+  try {
+    const { telegramInitData, walletAddress } = req.body;
+    
+    // Verify Telegram authentication
+    const telegramUser = verifyTelegramData(telegramInitData);
+    if (!telegramUser) {
+      return res.status(401).json({ success: false, error: 'Invalid Telegram auth' });
+    }
+
+    const telegramId = telegramUser.id;
+    
+    // Check rate limit
+    if (!checkRateLimit(telegramId.toString(), 'update-wallet')) {
+      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+    }
+
+    // Validate wallet address format (basic validation)
+    if (!walletAddress || typeof walletAddress !== 'string' || walletAddress.length < 10) {
+      return res.status(400).json({ success: false, error: 'Invalid wallet address format' });
+    }
+
+    // Update user wallet address
+    const updateQuery = `
+      UPDATE users SET 
+        wallet_address = $1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE telegram_id = $2
+      RETURNING *;
+    `;
+    
+    const result = await db.query(updateQuery, [walletAddress, telegramId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    res.json({ success: true, message: 'Wallet updated successfully', user: result.rows[0] });
+    
+  } catch (error) {
+    console.error('Update wallet error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// /api/get-user (GET) - Returns user data by Telegram ID
+app.get('/api/get-user', async (req, res) => {
+  try {
+    const telegramId = req.query.telegramId;
+    
+    if (!telegramId) {
+      return res.status(400).json({ success: false, error: 'Telegram ID is required' });
+    }
+
+    // Check rate limit
+    if (!checkRateLimit(telegramId, 'get-user')) {
+      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+    }
+
+    const query = 'SELECT * FROM users WHERE telegram_id = $1';
+    const result = await db.query(query, [telegramId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    res.json({ success: true, user: result.rows[0] });
+    
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// /api/get-leaderboard (GET) - Returns top 50 users by balance
+app.get('/api/get-leaderboard', async (req, res) => {
+  try {
+    // Check rate limit
+    if (!checkRateLimit('leaderboard', 'get-leaderboard')) {
+      return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
+    }
+
+    const query = `
+      SELECT 
+        telegram_id, 
+        username, 
+        first_name, 
+        last_name, 
+        photo_url, 
+        balance,
+        ton_balance,
+        gameplay_balance,
+        rare_balance,
+        event_balance,
+        daily_supply_balance,
+        merchant_balance,
+        referral_balance
+      FROM users 
+      WHERE is_banned = FALSE
+      ORDER BY balance DESC 
+      LIMIT 50
+    `;
+    
+    const result = await db.query(query);
+
+    res.json({ success: true, leaderboard: result.rows });
+    
+  } catch (error) {
+    console.error('Get leaderboard error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 // Basic route
 app.get('/', (req, res) => {
   res.json({ message: 'ELZR Hunt Railway Backend API' });
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
 
 // Function to run migrations
 async function runMigrations() {
@@ -234,12 +622,6 @@ async function runMigrations() {
 async function startServer() {
   // Run migrations but don't stop server if they fail
   await runMigrations();
-
-  // Error handling middleware
-  app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
-  });
 
   // Start server
   const PORT = process.env.PORT || 5174;
