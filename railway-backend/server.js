@@ -265,7 +265,7 @@ app.get('/health', async (req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5173;
 
 async function startServer() {
   try {
