@@ -22,7 +22,7 @@ const loadAdsgramScript = (): Promise<void> => {
         script.onload = () => {
             resolve();
         };
-        script.onerror = (e) => {
+        script.onerror = () => {
             reject(new Error("AdsgramScriptError"));
         };
         document.body.appendChild(script);

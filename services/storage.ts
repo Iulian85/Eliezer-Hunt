@@ -10,7 +10,7 @@ export const loadState = (): UserState | null => {
     return null; // Force fetch from PostgreSQL every time via backend API
 };
 
-export const saveState = (state: UserState) => {
+export const saveState = (_state: UserState) => {
     // Disabled for security
 };
 

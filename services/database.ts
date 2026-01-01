@@ -24,7 +24,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 };
 
 // Sanitize user data to match UserState interface
-const sanitizeUserData = (data: any, defaults: UserState): UserState => {
+const sanitizeUserData = (data: Partial<UserState>, defaults: UserState): UserState => {
   return {
     ...defaults,
     ...data,
@@ -41,9 +41,9 @@ const sanitizeUserData = (data: any, defaults: UserState): UserState => {
 };
 
 // Subscribe to user profile (this would typically use WebSocket or polling in a real implementation)
-export const subscribeToUserProfile = (tgId: number, defaults: UserState, callback: (userData: UserState) => void) => {
+export const subscribeToUserProfile = (tgId: number, defaults: UserState, callback: (userData: UserState) => void): (() => void) => {
   if (!tgId) return () => {};
-  
+
   // In a real implementation, this would use WebSocket or long polling
   // For now, we'll use a simple polling approach
   let isActive = true;
@@ -101,7 +101,7 @@ export const getUserById = async (tgId: number): Promise<UserState> => {
       sponsoredAdsWatched: 0,
       rareItemsCollected: 0,
       eventItemsCollected: 0,
-      lastInitData: null,
+      lastInitData: "",
       location: null,
       screenshotLock: false,
       isAirdropped: false,
@@ -112,18 +112,18 @@ export const getUserById = async (tgId: number): Promise<UserState> => {
 };
 
 // Sync user with database
-export const syncUserWithDatabase = async (userData: any, localState: UserState, fingerprint: string): Promise<UserState> => {
+export const syncUserWithDatabase = async (userData: Record<string, any>, localState: UserState, fingerprint: string): Promise<UserState> => {
   if (!userData.id) return localState;
 
   try {
     // Sync user with new endpoint that handles Telegram auth and fingerprint
-    // We need to format the data as if it came from Telegram WebApp
-    const telegramInitData = `id=${userData.id}&first_name=${encodeURIComponent(userData.first_name || '')}&last_name=${encodeURIComponent(userData.last_name || '')}&username=${encodeURIComponent(userData.username || '')}&photo_url=${encodeURIComponent(userData.photo_url || '')}`;
+    // Use the actual Telegram init data from the WebApp
+    const telegramInitData = userData?.auth_date ? userData : (userData?.initData || userData?.webAppData?.initData || '');
 
     const response = await apiRequest("/api/sync-user", {
       method: "POST",
       body: JSON.stringify({
-        telegramInitData: telegramInitData, // Pass the formatted Telegram data
+        telegramInitData: telegramInitData, // Pass the actual Telegram init data
         fingerprint: fingerprint,
       }),
     });
@@ -136,17 +136,18 @@ export const syncUserWithDatabase = async (userData: any, localState: UserState,
 };
 
 // Save collection to database
-export const saveCollectionToDatabase = async (tgId: number, spawnId: string, value: number, category?: HotspotCategory, tonReward: number = 0, location?: any) => {
+export const saveCollectionToDatabase = async (tgId: number, spawnId: string, value: number, category?: HotspotCategory, tonReward: number = 0, location?: Record<string, any>): Promise<void> => {
   if (!tgId) return;
 
   try {
     // Use the new collect endpoint that handles all the logic
-    const telegramInitData = `id=${tgId}`;
+    // For now, we'll just pass the telegram ID since we don't have the full init data here
+    // In a real implementation, you'd have access to the full Telegram init data
 
     await apiRequest("/api/collect", {
       method: "POST",
       body: JSON.stringify({
-        telegramInitData: telegramInitData, // Pass minimal Telegram data
+        telegramInitData: `id=${tgId}`, // Pass minimal Telegram data
         spawnId: spawnId,
         value: value,
         category: category || "URBAN",
@@ -160,7 +161,7 @@ export const saveCollectionToDatabase = async (tgId: number, spawnId: string, va
 };
 
 // Process referral reward
-export const processReferralReward = async (referrerId: string, userId: number, userName: string) => {
+export const processReferralReward = async (_referrerId: string, _userId: number, _userName: string): Promise<void> => {
   try {
     // For now, we'll keep the existing logic since referral endpoints weren't specified in the prompt
     // In a real implementation, you'd need to add referral-specific endpoints to the Bun.js server
@@ -171,7 +172,7 @@ export const processReferralReward = async (referrerId: string, userId: number, 
 };
 
 // Get leaderboard
-export const getLeaderboard = async () => {
+export const getLeaderboard = async (): Promise<any[]> => {
   try {
     const response = await apiRequest("/api/get-leaderboard");
     return response.leaderboard;
@@ -182,7 +183,7 @@ export const getLeaderboard = async () => {
 };
 
 // Reset user
-export const resetUserInDatabase = async (targetUserId: number) => {
+export const resetUserInDatabase = async (_targetUserId: number): Promise<{ success: boolean }> => {
   try {
     // For now, we'll keep the existing logic since reset endpoint wasn't specified in the prompt
     // In a real implementation, you'd need to add a reset-specific endpoint to the Bun.js server
@@ -195,7 +196,7 @@ export const resetUserInDatabase = async (targetUserId: number) => {
 };
 
 // Campaign functions
-export const subscribeToCampaigns = (cb: any) => {
+export const subscribeToCampaigns = (cb: (campaigns: any[]) => void): (() => void) => {
   // In a real implementation, this would use WebSocket
   // For now, we'll use a simple polling approach
   let isActive = true;
@@ -227,7 +228,7 @@ export const getAllCampaigns = async () => {
   }
 };
 
-export const createCampaignDatabase = async (campaign: any) => {
+export const createCampaignDatabase = async (campaign: Record<string, any>): Promise<any> => {
   try {
     const response = await apiRequest("/api/campaigns", {
       method: "POST",
@@ -240,7 +241,7 @@ export const createCampaignDatabase = async (campaign: any) => {
   }
 };
 
-export const updateCampaignStatusDatabase = async (id: string, status: string) => {
+export const updateCampaignStatusDatabase = async (id: string, status: string): Promise<any> => {
   try {
     const response = await apiRequest(`/api/campaigns/${id}/status`, {
       method: "PUT",
@@ -253,7 +254,7 @@ export const updateCampaignStatusDatabase = async (id: string, status: string) =
   }
 };
 
-export const deleteCampaignDatabase = async (id: string) => {
+export const deleteCampaignDatabase = async (id: string): Promise<any> => {
   try {
     const response = await apiRequest(`/api/campaigns/${id}`, {
       method: "DELETE",
@@ -266,7 +267,7 @@ export const deleteCampaignDatabase = async (id: string) => {
 };
 
 // Hotspot functions
-export const subscribeToHotspots = (cb: any) => {
+export const subscribeToHotspots = (cb: (hotspots: any[]) => void): (() => void) => {
   // In a real implementation, this would use WebSocket
   // For now, we'll use a simple polling approach
   let isActive = true;
@@ -298,7 +299,7 @@ export const getAllHotspots = async () => {
   }
 };
 
-export const saveHotspotDatabase = async (hotspot: any) => {
+export const saveHotspotDatabase = async (hotspot: Record<string, any>): Promise<any> => {
   try {
     const response = await apiRequest("/api/hotspots", {
       method: "POST",
@@ -311,7 +312,7 @@ export const saveHotspotDatabase = async (hotspot: any) => {
   }
 };
 
-export const deleteHotspotDatabase = async (id: string) => {
+export const deleteHotspotDatabase = async (id: string): Promise<any> => {
   try {
     const response = await apiRequest(`/api/hotspots/${id}`, {
       method: "DELETE",
@@ -370,15 +371,16 @@ export const updateWithdrawalStatus = async (id: string, status: string) => {
 };
 
 // User management functions
-export const updateUserWalletInDatabase = async (id: number, walletAddress: string) => {
+export const updateUserWalletInDatabase = async (id: number, walletAddress: string): Promise<any> => {
   try {
     // Use the new update-wallet endpoint that handles Telegram auth
-    const telegramInitData = `id=${id}`;
+    // For now, we'll just pass the telegram ID since we don't have the full init data here
+    // In a real implementation, you'd have access to the full Telegram init data
 
     const response = await apiRequest("/api/update-wallet", {
       method: "POST",
       body: JSON.stringify({
-        telegramInitData: telegramInitData, // Pass minimal Telegram data
+        telegramInitData: `id=${id}`, // Pass minimal Telegram data
         walletAddress: walletAddress
       }),
     });
@@ -389,7 +391,7 @@ export const updateUserWalletInDatabase = async (id: number, walletAddress: stri
   }
 };
 
-export const deleteUserDatabase = async (id: string) => {
+export const deleteUserDatabase = async (id: string): Promise<any> => {
   try {
     const response = await apiRequest(`/api/users/${id}`, {
       method: "DELETE",
@@ -401,7 +403,7 @@ export const deleteUserDatabase = async (id: string) => {
   }
 };
 
-export const toggleUserBan = async (id: string, isBanned: boolean) => {
+export const toggleUserBan = async (id: string, isBanned: boolean): Promise<any> => {
   try {
     const response = await apiRequest(`/api/users/${id}/ban`, {
       method: "PUT",
@@ -414,7 +416,7 @@ export const toggleUserBan = async (id: string, isBanned: boolean) => {
   }
 };
 
-export const toggleUserBiometricSetting = async (id: string, enabled: boolean) => {
+export const toggleUserBiometricSetting = async (id: string, enabled: boolean): Promise<any> => {
   try {
     const response = await apiRequest(`/api/users/${id}/biometric`, {
       method: "PUT",
@@ -427,7 +429,7 @@ export const toggleUserBiometricSetting = async (id: string, enabled: boolean) =
   }
 };
 
-export const getAllUsersAdmin = async () => {
+export const getAllUsersAdmin = async (): Promise<any[]> => {
   try {
     const response = await apiRequest("/api/users");
     return response.users;
@@ -438,14 +440,15 @@ export const getAllUsersAdmin = async () => {
 };
 
 // Withdrawal processing
-export const processWithdrawTON = async (tgId: number, amount: number) => {
+export const processWithdrawTON = async (tgId: number, amount: number): Promise<any> => {
   try {
-    const telegramInitData = `id=${tgId}`;
+    // For now, we'll just pass the telegram ID since we don't have the full init data here
+    // In a real implementation, you'd have access to the full Telegram init data
 
     const response = await apiRequest("/api/withdrawals", {
       method: "POST",
       body: JSON.stringify({
-        telegramInitData: telegramInitData, // Pass minimal Telegram data
+        telegramInitData: `id=${tgId}`, // Pass minimal Telegram data
         amount: Number(amount),
         status: "pending",
       }),
@@ -458,7 +461,7 @@ export const processWithdrawTON = async (tgId: number, amount: number) => {
 };
 
 // Airdrop functions
-export const markUserAirdropped = async (id: string, allocation: number) => {
+export const markUserAirdropped = async (id: string, allocation: number): Promise<any> => {
   try {
     const response = await apiRequest(`/api/users/${id}/airdrop`, {
       method: "POST",
@@ -472,7 +475,7 @@ export const markUserAirdropped = async (id: string, allocation: number) => {
 };
 
 // Get admin wallet (this would be implemented in the backend)
-export const getAdminWallet = async () => {
+export const getAdminWallet = async (): Promise<any | null> => {
   try {
     const response = await apiRequest("/api/admin/wallet");
     return response;
@@ -483,7 +486,7 @@ export const getAdminWallet = async () => {
 };
 
 // AI Chat function (would proxy to backend)
-export const askGeminiProxy = async (messages: any[]) => {
+export const askGeminiProxy = async (messages: any[]): Promise<any> => {
   try {
     const response = await apiRequest("/api/ai/chat", {
       method: "POST",
