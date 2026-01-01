@@ -47,12 +47,25 @@ pool.on('error', (err) => {
   console.error('Unexpected database error', err);
 });
 
-// Run migrations ONCE
-async function runMigrations() {
+// Test connection at startup
+async function testConnection() {
+  try {
+    await pool.query('SELECT NOW()');
+    console.log('✅ Database connection test successful');
+  } catch (error) {
+    console.error('❌ Database connection test failed:', error.message);
+  }
+}
+
+testConnection();
+
+// Simple table creation - create tables if they don't exist
+async function initializeDatabase() {
   const client = await pool.connect();
   try {
-    console.log('Running database migrations...');
-    
+    console.log('Initializing database tables...');
+
+    // Create users table
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -89,6 +102,7 @@ async function runMigrations() {
       );
     `);
 
+    // Create claims table
     await client.query(`
       CREATE TABLE IF NOT EXISTS claims (
         id SERIAL PRIMARY KEY,
@@ -103,6 +117,7 @@ async function runMigrations() {
       );
     `);
 
+    // Create campaigns table
     await client.query(`
       CREATE TABLE IF NOT EXISTS campaigns (
         id SERIAL PRIMARY KEY,
@@ -131,6 +146,7 @@ async function runMigrations() {
       );
     `);
 
+    // Create hotspots table
     await client.query(`
       CREATE TABLE IF NOT EXISTS hotspots (
         id VARCHAR(255) PRIMARY KEY,
@@ -150,6 +166,7 @@ async function runMigrations() {
       );
     `);
 
+    // Create withdrawal_requests table
     await client.query(`
       CREATE TABLE IF NOT EXISTS withdrawal_requests (
         id SERIAL PRIMARY KEY,
@@ -161,59 +178,9 @@ async function runMigrations() {
       );
     `);
 
-    // Function to update updated_at timestamp
-    await client.query(`
-      CREATE OR REPLACE FUNCTION update_updated_at_column()
-      RETURNS TRIGGER AS $$
-      BEGIN
-          NEW.updated_at = CURRENT_TIMESTAMP;
-          RETURN NEW;
-      END;
-      $$ language 'plpgsql';
-    `);
-
-    // Trigger to update updated_at for users table
-    await client.query(`
-      CREATE TRIGGER update_users_updated_at
-          BEFORE UPDATE ON users
-          FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column();
-    `);
-
-    // Trigger to update updated_at for campaigns table
-    await client.query(`
-      CREATE TRIGGER update_campaigns_updated_at
-          BEFORE UPDATE ON campaigns
-          FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column();
-    `);
-
-    // Trigger to update updated_at for hotspots table
-    await client.query(`
-      CREATE TRIGGER update_hotspots_updated_at
-          BEFORE UPDATE ON hotspots
-          FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column();
-    `);
-
-    // Indexes for performance
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
-      CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
-      CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
-      CREATE INDEX IF NOT EXISTS idx_claims_user_id ON claims(user_id);
-      CREATE INDEX IF NOT EXISTS idx_claims_spawn_id ON claims(spawn_id);
-      CREATE INDEX IF NOT EXISTS idx_claims_created_at ON claims(created_at);
-      CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at);
-      CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
-      CREATE INDEX IF NOT EXISTS idx_campaigns_owner_wallet ON campaigns(owner_wallet);
-      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user_id ON withdrawal_requests(user_id);
-      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status ON withdrawal_requests(status);
-    `);
-    
-    console.log('Migrations completed successfully');
+    console.log('Database tables created successfully');
   } catch (error) {
-    console.error('Migration error:', error);
+    console.error('Database initialization error:', error);
   } finally {
     client.release();
   }
@@ -265,12 +232,12 @@ app.get('/health', async (req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 5000;
 
 async function startServer() {
   try {
-    // Rulează migrațiile o singură dată
-    await runMigrations();
+    // Initialize database tables
+    await initializeDatabase();
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
