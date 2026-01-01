@@ -1,5 +1,5 @@
 const express = require('express');
-const port = 3000
+const port = 8080
 const { Pool } = require('pg');
 const crypto = require('crypto');
 require('dotenv').config();
