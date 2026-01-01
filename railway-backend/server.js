@@ -1,10 +1,24 @@
 const express = require('express');
 const port = 3000
-const { Pool } = require('pg');
 const crypto = require('crypto');
+const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
+
+// Create a PostgreSQL connection pool
+const pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+// Create Prisma adapter
+const adapter = new PrismaPg(pgPool);
+const prisma = new PrismaClient({ adapter });
 
 // Middleware
 app.use(express.json());
@@ -22,28 +36,21 @@ app.use((req, res, next) => {
   }
 });
 
-// Database connection POOL (MUȘTE mai bun!)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: "prefer",
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
 // Test database connection
 async function testDatabaseConnection() {
   console.log('🔍 Testing database connection...');
-  const client = await pool.connect();
   try {
-    const result = await client.query('SELECT NOW() as time');
-    console.log('✅ Database connected at:', result.rows[0].time);
-    return true;
+    if (process.env.DATABASE_URL) {
+      await prisma.$connect();
+      console.log('✅ Database connected successfully');
+      return true;
+    } else {
+      console.log('⚠️  DATABASE_URL not set, skipping connection test');
+      return false;
+    }
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
     return false;
-  } finally {
-    client.release();
   }
 }
 
@@ -149,156 +156,46 @@ function checkRateLimit(userId, action, maxRequests = 10, windowMs = 60000) {
 // RUN MIGRATIONS - FUNCȚIA REVIZUITĂ
 async function runMigrations() {
   console.log('🔄 Running database migrations...');
-  const client = await pool.connect();
-
   try {
-    console.log('📝 Attempting to create users table...');
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        telegram_id BIGINT UNIQUE NOT NULL,
-        username VARCHAR(255),
-        first_name VARCHAR(255),
-        last_name VARCHAR(255),
-        photo_url TEXT,
-        device_fingerprint VARCHAR(255),
-        balance BIGINT DEFAULT 0,
-        ton_balance BIGINT DEFAULT 0,
-        gameplay_balance BIGINT DEFAULT 0,
-        rare_balance BIGINT DEFAULT 0,
-        event_balance BIGINT DEFAULT 0,
-        daily_supply_balance BIGINT DEFAULT 0,
-        merchant_balance BIGINT DEFAULT 0,
-        referral_balance BIGINT DEFAULT 0,
-        biometric_enabled BOOLEAN DEFAULT true,
-        is_banned BOOLEAN DEFAULT false,
-        wallet_address VARCHAR(255),
-        referrals INTEGER DEFAULT 0,
-        has_claimed_referral BOOLEAN DEFAULT false,
-        ads_watched INTEGER DEFAULT 0,
-        sponsored_ads_watched INTEGER DEFAULT 0,
-        rare_items_collected INTEGER DEFAULT 0,
-        event_items_collected INTEGER DEFAULT 0,
-        screenshot_lock BOOLEAN DEFAULT false,
-        is_airdropped BOOLEAN DEFAULT false,
-        airdrop_allocation BIGINT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('✅ Users table created successfully');
+    // Prisma 7 uses schema-based migrations, so we'll just test the connection
+    // The actual table creation is handled by Prisma schema and migrations
+    console.log('📝 Prisma schema-based migrations will be handled by Prisma CLI');
+    console.log('📝 Use `npx prisma db push` for development or `npx prisma migrate dev` for production');
 
-    console.log('📝 Attempting to create claims table...');
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS claims (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        spawn_id VARCHAR(255) NOT NULL,
-        category VARCHAR(50),
-        claimed_value BIGINT DEFAULT 0,
-        ton_reward BIGINT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('✅ Claims table created successfully');
+    // Test that the database connection works with Prisma
+    if (process.env.DATABASE_URL) {
+      await prisma.$connect();
+      console.log('✅ Prisma database connection established successfully');
 
-    console.log('📝 Attempting to create campaigns table...');
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS campaigns (
-        id SERIAL PRIMARY KEY,
-        owner_wallet VARCHAR(255) NOT NULL,
-        target_lat DECIMAL(10, 8) NOT NULL,
-        target_lng DECIMAL(11, 8) NOT NULL,
-        count INTEGER DEFAULT 1,
-        multiplier INTEGER DEFAULT 1,
-        duration_days INTEGER DEFAULT 1,
-        expiry_date BIGINT,
-        total_price BIGINT DEFAULT 0,
-        brand_name VARCHAR(255),
-        logo_url TEXT,
-        video_url TEXT,
-        video_file_name TEXT,
-        contact_street VARCHAR(255),
-        contact_city VARCHAR(255),
-        contact_zip VARCHAR(50),
-        contact_country VARCHAR(100),
-        contact_phone VARCHAR(50),
-        contact_email VARCHAR(255),
-        contact_website VARCHAR(255),
-        status VARCHAR(50) DEFAULT 'pending_review',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('✅ Campaigns table created successfully');
+      // Try to access one of the models to verify they exist
+      try {
+        await prisma.user.count();
+        console.log('✅ User model is accessible');
+      } catch (error) {
+        console.log('⚠️  User model may not exist yet - run migrations first');
+      }
+    } else {
+      console.log('⚠️  DATABASE_URL not set, skipping database connection test');
+    }
 
-    console.log('📝 Attempting to create hotspots table...');
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS hotspots (
-        id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        lat DECIMAL(10, 8) NOT NULL,
-        lng DECIMAL(11, 8) NOT NULL,
-        radius INTEGER DEFAULT 100,
-        density INTEGER DEFAULT 10,
-        category VARCHAR(50),
-        base_value BIGINT DEFAULT 100,
-        logo_url TEXT,
-        custom_text VARCHAR(100),
-        prizes TEXT, -- JSON array of numbers as text
-        video_url TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('✅ Hotspots table created successfully');
-
-    console.log('📝 Attempting to create withdrawal_requests table...');
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS withdrawal_requests (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        amount BIGINT NOT NULL,
-        status VARCHAR(50) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        processed_at TIMESTAMP
-      );
-    `);
-    console.log('✅ Withdrawal requests table created successfully');
-
-    console.log('📝 Attempting to create indexes...');
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_users_telegram ON users(telegram_id);
-      CREATE INDEX IF NOT EXISTS idx_claims_user ON claims(user_id);
-      CREATE INDEX IF NOT EXISTS idx_claims_spawn ON claims(spawn_id);
-      CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
-      CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(created_at);
-      CREATE INDEX IF NOT EXISTS idx_campaigns_owner ON campaigns(owner_wallet);
-      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user ON withdrawal_requests(user_id);
-    `);
-    console.log('✅ Indexes created successfully');
-
-    console.log('🎉 All migrations completed successfully!');
+    console.log('🎉 Migration check completed successfully!');
 
   } catch (error) {
     console.error('❌ Migration error details:', error);
     console.error('Full error object:', JSON.stringify(error, null, 2));
-    console.error('SQL State:', error.code);
     console.error('Error message:', error.message);
     // CONTINUĂ chiar dacă migrațiile eșuează parțial
-  } finally {
-    client.release();
   }
 }
 
 // API Routes
-const usersRouter = require('./routes/users')(pool);
-const claimsRouter = require('./routes/claims')(pool);
-const campaignsRouter = require('./routes/campaigns')(pool);
-const hotspotsRouter = require('./routes/hotspots')(pool);
-const withdrawalsRouter = require('./routes/withdrawals')(pool);
-const adminRouter = require('./routes/admin')(pool);
-const aiRouter = require('./routes/ai')(pool);
+const usersRouter = require('./routes/users')(prisma);
+const claimsRouter = require('./routes/claims')(prisma);
+const campaignsRouter = require('./routes/campaigns')(prisma);
+const hotspotsRouter = require('./routes/hotspots')(prisma);
+const withdrawalsRouter = require('./routes/withdrawals')(prisma);
+const adminRouter = require('./routes/admin')(prisma);
+const aiRouter = require('./routes/ai')(prisma);
 
 // API routes
 app.use('/api/users', usersRouter);
@@ -328,55 +225,27 @@ app.post('/api/sync-user', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
     }
 
-    // Check if user exists
-    const existingUserQuery = 'SELECT * FROM users WHERE telegram_id = $1';
-    const existingUserResult = await pool.query(existingUserQuery, [telegramId]);
+    // Use Prisma to create or update user
+    const user = await prisma.user.upsert({
+      where: { telegramId: BigInt(telegramId) },
+      update: {
+        username: telegramUser.username || undefined,
+        firstName: telegramUser.first_name || undefined,
+        lastName: telegramUser.last_name || undefined,
+        photoUrl: telegramUser.photo_url || undefined,
+        deviceFingerprint: fingerprint || undefined,
+      },
+      create: {
+        telegramId: BigInt(telegramId),
+        username: telegramUser.username,
+        firstName: telegramUser.first_name,
+        lastName: telegramUser.last_name,
+        photoUrl: telegramUser.photo_url,
+        deviceFingerprint: fingerprint,
+      }
+    });
 
-    if (existingUserResult.rows.length > 0) {
-      // Update existing user
-      const updateQuery = `
-        UPDATE users SET
-          username = COALESCE($2, username),
-          first_name = COALESCE($3, first_name),
-          last_name = COALESCE($4, last_name),
-          photo_url = COALESCE($5, photo_url),
-          device_fingerprint = COALESCE($6, device_fingerprint),
-          updated_at = CURRENT_TIMESTAMP
-        WHERE telegram_id = $1
-        RETURNING *;
-      `;
-
-      const result = await pool.query(updateQuery, [
-        telegramId,
-        telegramUser.username,
-        telegramUser.first_name,
-        telegramUser.last_name,
-        telegramUser.photo_url,
-        fingerprint
-      ]);
-
-      return res.json({ success: true, user: result.rows[0] });
-    } else {
-      // Create new user
-      const insertQuery = `
-        INSERT INTO users (
-          telegram_id, username, first_name, last_name,
-          photo_url, device_fingerprint
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *;
-      `;
-
-      const result = await pool.query(insertQuery, [
-        telegramId,
-        telegramUser.username,
-        telegramUser.first_name,
-        telegramUser.last_name,
-        telegramUser.photo_url,
-        fingerprint
-      ]);
-
-      return res.status(201).json({ success: true, user: result.rows[0] });
-    }
+    return res.json({ success: true, user });
 
   } catch (error) {
     console.error('Sync user error:', error);
@@ -404,82 +273,85 @@ app.post('/api/collect', async (req, res) => {
 
     // Check if collection already exists (except for ads)
     if (!spawnId.startsWith("ad-")) {
-      const existingCollectionQuery = 'SELECT * FROM claims WHERE user_id = (SELECT id FROM users WHERE telegram_id = $1) AND spawn_id = $2';
-      const existingCollectionResult = await pool.query(existingCollectionQuery, [telegramId, spawnId]);
+      const existingClaim = await prisma.claim.findFirst({
+        where: {
+          user: { telegramId: BigInt(telegramId) },
+          spawnId
+        }
+      });
 
-      if (existingCollectionResult.rows.length > 0) {
+      if (existingClaim) {
         return res.status(400).json({ success: false, error: 'Item already collected' });
       }
     }
 
-    // Get user ID from telegram_id
-    const userQuery = 'SELECT id FROM users WHERE telegram_id = $1';
-    const userResult = await pool.query(userQuery, [telegramId]);
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { telegramId: BigInt(telegramId) }
+    });
 
-    if (userResult.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    const userId = userResult.rows[0].id;
-
-    // Insert collection record
-    const insertClaimQuery = `
-      INSERT INTO claims (
-        user_id, spawn_id, category, claimed_value, ton_reward
-      ) VALUES ($1, $2, $3, $4, $5)
-      RETURNING *;
-    `;
-
-    await pool.query(insertClaimQuery, [userId, spawnId, category, value, tonReward]);
+    // Create collection record
+    await prisma.claim.create({
+      data: {
+        userId: user.id,
+        spawnId,
+        category,
+        claimedValue: BigInt(value),
+        tonReward: BigInt(tonReward)
+      }
+    });
 
     // Update user balance based on category
-    let updateField = 'gameplay_balance';
+    let balanceUpdate = {};
     if (category === 'AD_REWARD') {
-      updateField = 'daily_supply_balance';
+      balanceUpdate = {
+        dailySupplyBalance: { increment: BigInt(value) },
+        balance: { increment: BigInt(value) },
+        tonBalance: { increment: BigInt(tonReward) },
+        adsWatched: { increment: 1 }
+      };
     } else if (category === 'LANDMARK') {
-      updateField = 'rare_balance';
+      balanceUpdate = {
+        rareBalance: { increment: BigInt(value) },
+        balance: { increment: BigInt(value) },
+        tonBalance: { increment: BigInt(tonReward) },
+        rareItemsCollected: { increment: 1 }
+      };
     } else if (category === 'EVENT') {
-      updateField = 'event_balance';
+      balanceUpdate = {
+        eventBalance: { increment: BigInt(value) },
+        balance: { increment: BigInt(value) },
+        tonBalance: { increment: BigInt(tonReward) },
+        eventItemsCollected: { increment: 1 }
+      };
     } else if (category === 'MERCHANT') {
-      updateField = 'merchant_balance';
-    } else if (category === 'GIFTBOX') {
-      updateField = 'gameplay_balance';
+      balanceUpdate = {
+        merchantBalance: { increment: BigInt(value) },
+        balance: { increment: BigInt(value) },
+        tonBalance: { increment: BigInt(tonReward) },
+        sponsoredAdsWatched: { increment: 1 }
+      };
+    } else {
+      // Default case for GIFTBOX and other categories
+      balanceUpdate = {
+        gameplayBalance: { increment: BigInt(value) },
+        balance: { increment: BigInt(value) },
+        tonBalance: { increment: BigInt(tonReward) }
+      };
     }
 
-    // Update user balance and collected IDs
-    const updateUserQuery = `
-      UPDATE users SET
-        ${updateField} = ${updateField} + $1,
-        balance = balance + $1,
-        ton_balance = ton_balance + $2,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE telegram_id = $3
-    `;
-
-    await pool.query(updateUserQuery, [value, tonReward, telegramId]);
-
-    // Update counters based on category
-    if (category === 'LANDMARK') {
-      await pool.query(
-        'UPDATE users SET rare_items_collected = rare_items_collected + 1 WHERE telegram_id = $1',
-        [telegramId]
-      );
-    } else if (category === 'EVENT') {
-      await pool.query(
-        'UPDATE users SET event_items_collected = event_items_collected + 1 WHERE telegram_id = $1',
-        [telegramId]
-      );
-    } else if (category === 'AD_REWARD') {
-      await pool.query(
-        'UPDATE users SET ads_watched = ads_watched + 1 WHERE telegram_id = $1',
-        [telegramId]
-      );
-    } else if (category === 'MERCHANT') {
-      await pool.query(
-        'UPDATE users SET sponsored_ads_watched = sponsored_ads_watched + 1 WHERE telegram_id = $1',
-        [telegramId]
-      );
-    }
+    // Update user balance and collected counters
+    await prisma.user.update({
+      where: { telegramId: BigInt(telegramId) },
+      data: {
+        ...balanceUpdate,
+        updatedAt: new Date()
+      }
+    });
 
     res.json({ success: true, message: 'Collection saved successfully' });
 
@@ -513,23 +385,24 @@ app.post('/api/update-wallet', async (req, res) => {
     }
 
     // Update user wallet address
-    const updateQuery = `
-      UPDATE users SET
-        wallet_address = $1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE telegram_id = $2
-      RETURNING *;
-    `;
+    const user = await prisma.user.update({
+      where: { telegramId: BigInt(telegramId) },
+      data: {
+        walletAddress,
+        updatedAt: new Date()
+      }
+    });
 
-    const result = await pool.query(updateQuery, [walletAddress, telegramId]);
-
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    res.json({ success: true, message: 'Wallet updated successfully', user: result.rows[0] });
+    res.json({ success: true, message: 'Wallet updated successfully', user });
 
   } catch (error) {
+    if (error.code === 'P2025') { // Record not found error in Prisma
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
     console.error('Update wallet error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -549,14 +422,15 @@ app.get('/api/get-user', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
     }
 
-    const query = 'SELECT * FROM users WHERE telegram_id = $1';
-    const result = await pool.query(query, [telegramId]);
+    const user = await prisma.user.findUnique({
+      where: { telegramId: BigInt(telegramId) }
+    });
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    res.json({ success: true, user: result.rows[0] });
+    res.json({ success: true, user });
 
   } catch (error) {
     console.error('Get user error:', error);
@@ -572,30 +446,32 @@ app.get('/api/get-leaderboard', async (req, res) => {
       return res.status(429).json({ success: false, error: 'Rate limit exceeded' });
     }
 
-    const query = `
-      SELECT
-        telegram_id,
-        username,
-        first_name,
-        last_name,
-        photo_url,
-        balance,
-        ton_balance,
-        gameplay_balance,
-        rare_balance,
-        event_balance,
-        daily_supply_balance,
-        merchant_balance,
-        referral_balance
-      FROM users
-      WHERE is_banned = FALSE
-      ORDER BY balance DESC
-      LIMIT 50
-    `;
+    const leaderboard = await prisma.user.findMany({
+      where: {
+        isBanned: false
+      },
+      select: {
+        telegramId: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        photoUrl: true,
+        balance: true,
+        tonBalance: true,
+        gameplayBalance: true,
+        rareBalance: true,
+        eventBalance: true,
+        dailySupplyBalance: true,
+        merchantBalance: true,
+        referralBalance: true
+      },
+      orderBy: {
+        balance: 'desc'
+      },
+      take: 50
+    });
 
-    const result = await pool.query(query);
-
-    res.json({ success: true, leaderboard: result.rows });
+    res.json({ success: true, leaderboard });
 
   } catch (error) {
     console.error('Get leaderboard error:', error);
@@ -618,17 +494,15 @@ app.get('/', (req, res) => {
 // Health check pentru Railway
 app.get('/health', async (req, res) => {
   try {
-    const client = await pool.connect();
-    await client.query('SELECT 1');
-    client.release();
-    
-    res.json({ 
+    await prisma.$queryRaw`SELECT 1`;
+
+    res.json({
       status: 'healthy',
       database: 'connected',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'unhealthy',
       database: 'error',
       error: error.message,
@@ -640,14 +514,12 @@ app.get('/health', async (req, res) => {
 // Test database endpoint
 app.get('/test-db', async (req, res) => {
   try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT COUNT(*) as user_count FROM users');
-    client.release();
-    
+    const userCount = await prisma.user.count();
+
     res.json({
       success: true,
       database: 'working',
-      userCount: result.rows[0].user_count,
+      userCount,
       tables: ['users', 'claims', 'campaigns', 'hotspots', 'withdrawal_requests']
     });
   } catch (error) {
@@ -706,13 +578,13 @@ async function startServer() {
 // Handle shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
-  await pool.end();
+  await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully');
-  await pool.end();
+  await prisma.$disconnect();
   process.exit(0);
 });
 

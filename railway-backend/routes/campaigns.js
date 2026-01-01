@@ -1,16 +1,19 @@
 const express = require('express');
 const router = express.Router();
 
-// Accept database connection as parameter
-module.exports = (db) => {
+// Accept Prisma client as parameter
+module.exports = (prisma) => {
 
 // Get all campaigns
 router.get('/', async (req, res) => {
   try {
-    const query = 'SELECT * FROM campaigns ORDER BY created_at DESC';
-    const result = await db.query(query);
-    
-    res.json({ campaigns: result.rows });
+    const campaigns = await prisma.campaign.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json({ campaigns });
   } catch (error) {
     console.error('Error fetching campaigns:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -43,24 +46,32 @@ router.post('/', async (req, res) => {
       status
     } = req.body;
 
-    const query = `
-      INSERT INTO campaigns (
-        owner_wallet, target_lat, target_lng, count, multiplier, duration_days,
-        expiry_date, total_price, brand_name, logo_url, video_url, video_file_name,
-        contact_street, contact_city, contact_zip, contact_country, contact_phone,
-        contact_email, contact_website, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-      RETURNING *;
-    `;
+    const campaign = await prisma.campaign.create({
+      data: {
+        ownerWallet,
+        targetLat: new Decimal(targetLat),
+        targetLng: new Decimal(targetLng),
+        count: parseInt(count) || 1,
+        multiplier: parseInt(multiplier) || 1,
+        durationDays: parseInt(durationDays) || 1,
+        expiryDate: expiryDate ? BigInt(expiryDate) : null,
+        totalPrice: BigInt(totalPrice || 0),
+        brandName,
+        logoUrl,
+        videoUrl,
+        videoFileName,
+        contactStreet,
+        contactCity,
+        contactZip,
+        contactCountry,
+        contactPhone,
+        contactEmail,
+        contactWebsite,
+        status: status || 'pending_review'
+      }
+    });
 
-    const result = await db.query(query, [
-      ownerWallet, targetLat, targetLng, count, multiplier, durationDays,
-      expiryDate, totalPrice, brandName, logoUrl, videoUrl, videoFileName,
-      contactStreet, contactCity, contactZip, contactCountry, contactPhone,
-      contactEmail, contactWebsite, status
-    ]);
-
-    res.json(result.rows[0]);
+    res.json(campaign);
   } catch (error) {
     console.error('Error creating campaign:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -73,20 +84,16 @@ router.put('/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const query = `
-      UPDATE campaigns SET status = $1
-      WHERE id = $2
-      RETURNING *;
-    `;
+    const campaign = await prisma.campaign.update({
+      where: { id: parseInt(id) },
+      data: { status }
+    });
 
-    const result = await db.query(query, [status, id]);
-
-    if (result.rows.length === 0) {
+    res.json(campaign);
+  } catch (error) {
+    if (error.code === 'P2025') { // Record not found error in Prisma
       return res.status(404).json({ error: 'Campaign not found' });
     }
-
-    res.json(result.rows[0]);
-  } catch (error) {
     console.error('Error updating campaign status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -97,15 +104,15 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const query = 'DELETE FROM campaigns WHERE id = $1 RETURNING *';
-    const result = await db.query(query, [id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Campaign not found' });
-    }
+    await prisma.campaign.delete({
+      where: { id: parseInt(id) }
+    });
 
     res.json({ message: 'Campaign deleted successfully' });
   } catch (error) {
+    if (error.code === 'P2025') { // Record not found error in Prisma
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
     console.error('Error deleting campaign:', error);
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -1,16 +1,19 @@
 const express = require('express');
 const router = express.Router();
 
-// Accept database connection as parameter
-module.exports = (db) => {
+// Accept Prisma client as parameter
+module.exports = (prisma) => {
 
 // Get all hotspots
 router.get('/', async (req, res) => {
   try {
-    const query = 'SELECT * FROM hotspots ORDER BY created_at DESC';
-    const result = await db.query(query);
-    
-    res.json({ hotspots: result.rows });
+    const hotspots = await prisma.hotspot.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json({ hotspots });
   } catch (error) {
     console.error('Error fetching hotspots:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -35,18 +38,24 @@ router.post('/', async (req, res) => {
       videoUrl
     } = req.body;
 
-    const query = `
-      INSERT INTO hotspots (
-        id, name, lat, lng, radius, density, category, base_value, logo_url, custom_text, prizes, video_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING *;
-    `;
+    const hotspot = await prisma.hotspot.create({
+      data: {
+        id,
+        name,
+        lat: new Decimal(lat),
+        lng: new Decimal(lng),
+        radius: parseInt(radius) || 100,
+        density: parseInt(density) || 10,
+        category,
+        baseValue: BigInt(baseValue || 100),
+        logoUrl,
+        customText,
+        prizes,
+        videoUrl
+      }
+    });
 
-    const result = await db.query(query, [
-      id, name, lat, lng, radius, density, category, baseValue, logoUrl, customText, prizes, videoUrl
-    ]);
-
-    res.json(result.rows[0]);
+    res.json(hotspot);
   } catch (error) {
     console.error('Error creating hotspot:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -59,25 +68,19 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Build dynamic query based on provided fields
-    const fields = Object.keys(updates);
-    if (fields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
+    // Remove id from updates to avoid updating the primary key
+    const { id: updateId, ...updateData } = updates;
 
-    const setClause = fields.map((field, index) => `"${field}" = $${index + 1}`).join(', ');
-    const values = fields.map(field => updates[field]);
-    values.push(id); // Add ID for WHERE clause
+    const hotspot = await prisma.hotspot.update({
+      where: { id },
+      data: updateData
+    });
 
-    const query = `UPDATE hotspots SET ${setClause} WHERE id = $${fields.length + 1} RETURNING *;`;
-    const result = await db.query(query, values);
-
-    if (result.rows.length === 0) {
+    res.json(hotspot);
+  } catch (error) {
+    if (error.code === 'P2025') { // Record not found error in Prisma
       return res.status(404).json({ error: 'Hotspot not found' });
     }
-
-    res.json(result.rows[0]);
-  } catch (error) {
     console.error('Error updating hotspot:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -88,15 +91,15 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const query = 'DELETE FROM hotspots WHERE id = $1 RETURNING *';
-    const result = await db.query(query, [id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Hotspot not found' });
-    }
+    await prisma.hotspot.delete({
+      where: { id }
+    });
 
     res.json({ message: 'Hotspot deleted successfully' });
   } catch (error) {
+    if (error.code === 'P2025') { // Record not found error in Prisma
+      return res.status(404).json({ error: 'Hotspot not found' });
+    }
     console.error('Error deleting hotspot:', error);
     res.status(500).json({ error: 'Internal server error' });
   }

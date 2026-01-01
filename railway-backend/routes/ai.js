@@ -2,8 +2,8 @@ const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const router = express.Router();
 
-// Accept database connection as parameter (even if not used)
-module.exports = (db) => {
+// Accept Prisma client as parameter (even if not used)
+module.exports = (prisma) => {
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI(process.env.VITE_GEMINI_API_KEY);
 

@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                           Int      @id @default(autoincrement())
+  telegramId                   BigInt   @unique
+  username                     String?
+  firstName                    String?
+  lastName                     String?
+  photoUrl                     String?
+  deviceFingerprint            String?
+  balance                      BigInt   @default(0)
+  tonBalance                   BigInt   @default(0)
+  gameplayBalance              BigInt   @default(0)
+  rareBalance                  BigInt   @default(0)
+  eventBalance                 BigInt   @default(0)
+  dailySupplyBalance           BigInt   @default(0)
+  merchantBalance              BigInt   @default(0)
+  referralBalance              BigInt   @default(0)
+  biometricEnabled             Boolean  @default(true)
+  isBanned                     Boolean  @default(false)
+  walletAddress                String?
+  referrals                    Int      @default(0)
+  hasClaimedReferral           Boolean  @default(false)
+  adsWatched                   Int      @default(0)
+  sponsoredAdsWatched          Int      @default(0)
+  rareItemsCollected           Int      @default(0)
+  eventItemsCollected          Int      @default(0)
+  screenshotLock               Boolean  @default(false)
+  isAirdropped                 Boolean  @default(false)
+  airdropAllocation            BigInt   @default(0)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @default(now()) @updatedAt
+
+  claims                       Claim[]
+  withdrawalRequests           WithdrawalRequest[]
+}
+
+model Claim {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spawnId        String
+  category       String?
+  claimedValue   BigInt   @default(0)
+  tonReward      BigInt   @default(0)
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([spawnId])
+}
+
+model Campaign {
+  id                Int       @id @default(autoincrement())
+  ownerWallet       String
+  targetLat         Decimal
+  targetLng         Decimal
+  count             Int       @default(1)
+  multiplier        Int       @default(1)
+  durationDays      Int       @default(1)
+  expiryDate        BigInt?
+  totalPrice        BigInt    @default(0)
+  brandName         String?
+  logoUrl           String?
+  videoUrl          String?
+  videoFileName     String?
+  contactStreet     String?
+  contactCity       String?
+  contactZip        String?
+  contactCountry    String?
+  contactPhone      String?
+  contactEmail      String?
+  contactWebsite    String?
+  status            String    @default("pending_review")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  @@index([ownerWallet])
+}
+
+model Hotspot {
+  id           String   @id
+  name         String
+  lat          Decimal
+  lng          Decimal
+  radius       Int      @default(100)
+  density      Int      @default(10)
+  category     String?
+  baseValue    BigInt   @default(100)
+  logoUrl      String?
+  customText   String?
+  prizes       String?  // JSON array of numbers as text
+  videoUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+model WithdrawalRequest {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount     BigInt
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([userId])
+}

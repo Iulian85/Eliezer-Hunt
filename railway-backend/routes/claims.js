@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
-// Accept database connection as parameter
-module.exports = (db) => {
+// Accept Prisma client as parameter
+module.exports = (prisma) => {
 
 // Create a new claim
 router.post('/', async (req, res) => {
@@ -16,18 +16,18 @@ router.post('/', async (req, res) => {
       status
     } = req.body;
 
-    const query = `
-      INSERT INTO claims (
-        user_id, spawn_id, category, claimed_value, ton_reward, status
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *;
-    `;
+    const claim = await prisma.claim.create({
+      data: {
+        userId: parseInt(userId),
+        spawnId,
+        category,
+        claimedValue: BigInt(claimedValue || 0),
+        tonReward: BigInt(tonReward || 0),
+        status: status || 'completed' // default status
+      }
+    });
 
-    const result = await db.query(query, [
-      userId, spawnId, category, claimedValue, tonReward, status
-    ]);
-
-    res.json(result.rows[0]);
+    res.json(claim);
   } catch (error) {
     console.error('Error creating claim:', error);
     res.status(500).json({ error: 'Internal server error' });

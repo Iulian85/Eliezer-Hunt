@@ -1,16 +1,19 @@
 const express = require('express');
 const router = express.Router();
 
-// Accept database connection as parameter
-module.exports = (db) => {
+// Accept Prisma client as parameter
+module.exports = (prisma) => {
 
 // Get all withdrawal requests
 router.get('/', async (req, res) => {
   try {
-    const query = 'SELECT * FROM withdrawal_requests ORDER BY created_at DESC';
-    const result = await db.query(query);
-    
-    res.json({ requests: result.rows });
+    const requests = await prisma.withdrawalRequest.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json({ requests });
   } catch (error) {
     console.error('Error fetching withdrawal requests:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -26,18 +29,15 @@ router.post('/', async (req, res) => {
       status
     } = req.body;
 
-    const query = `
-      INSERT INTO withdrawal_requests (
-        user_id, amount, status
-      ) VALUES ($1, $2, $3)
-      RETURNING *;
-    `;
+    const request = await prisma.withdrawalRequest.create({
+      data: {
+        userId: parseInt(userId),
+        amount: BigInt(amount),
+        status: status || 'pending'
+      }
+    });
 
-    const result = await db.query(query, [
-      userId, amount, status || 'pending'
-    ]);
-
-    res.json(result.rows[0]);
+    res.json(request);
   } catch (error) {
     console.error('Error creating withdrawal request:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -50,20 +50,19 @@ router.put('/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const query = `
-      UPDATE withdrawal_requests SET status = $1, processed_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-      RETURNING *;
-    `;
+    const request = await prisma.withdrawalRequest.update({
+      where: { id: parseInt(id) },
+      data: {
+        status,
+        processedAt: new Date()
+      }
+    });
 
-    const result = await db.query(query, [status, id]);
-
-    if (result.rows.length === 0) {
+    res.json(request);
+  } catch (error) {
+    if (error.code === 'P2025') { // Record not found error in Prisma
       return res.status(404).json({ error: 'Withdrawal request not found' });
     }
-
-    res.json(result.rows[0]);
-  } catch (error) {
     console.error('Error updating withdrawal status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
