@@ -35,7 +35,7 @@ app.use(cors({
 // Database connection POOL (mai bun pentru Railway)
 const pool = new Pool({
   connectionString: process.env.DATABASE_PUBLIC_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: "prefer",
 });
 
 // Test database connection
