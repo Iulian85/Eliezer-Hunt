@@ -150,9 +150,9 @@ function checkRateLimit(userId, action, maxRequests = 10, windowMs = 60000) {
 async function runMigrations() {
   console.log('🔄 Running database migrations...');
   const client = await pool.connect();
-  
+
   try {
-    // Tabela users - VERSIUNE SIMPLIFICATĂ FĂRĂ ERORI
+    console.log('📝 Attempting to create users table...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -186,9 +186,9 @@ async function runMigrations() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created users table');
+    console.log('✅ Users table created successfully');
 
-    // Tabela claims - SIMPLĂ
+    console.log('📝 Attempting to create claims table...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS claims (
         id SERIAL PRIMARY KEY,
@@ -200,9 +200,9 @@ async function runMigrations() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created claims table');
+    console.log('✅ Claims table created successfully');
 
-    // Tabela campaigns
+    console.log('📝 Attempting to create campaigns table...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS campaigns (
         id SERIAL PRIMARY KEY,
@@ -230,9 +230,9 @@ async function runMigrations() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created campaigns table');
+    console.log('✅ Campaigns table created successfully');
 
-    // Tabela hotspots
+    console.log('📝 Attempting to create hotspots table...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS hotspots (
         id VARCHAR(255) PRIMARY KEY,
@@ -251,9 +251,9 @@ async function runMigrations() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created hotspots table');
+    console.log('✅ Hotspots table created successfully');
 
-    // Tabela withdrawal_requests
+    console.log('📝 Attempting to create withdrawal_requests table...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS withdrawal_requests (
         id SERIAL PRIMARY KEY,
@@ -264,9 +264,9 @@ async function runMigrations() {
         processed_at TIMESTAMP
       );
     `);
-    console.log('✅ Created withdrawal_requests table');
+    console.log('✅ Withdrawal requests table created successfully');
 
-    // Indexuri
+    console.log('📝 Attempting to create indexes...');
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_users_telegram ON users(telegram_id);
       CREATE INDEX IF NOT EXISTS idx_claims_user ON claims(user_id);
@@ -276,13 +276,15 @@ async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_campaigns_owner ON campaigns(owner_wallet);
       CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user ON withdrawal_requests(user_id);
     `);
-    console.log('✅ Created indexes');
+    console.log('✅ Indexes created successfully');
 
     console.log('🎉 All migrations completed successfully!');
 
   } catch (error) {
-    console.error('❌ Migration error:', error.message);
+    console.error('❌ Migration error details:', error);
+    console.error('Full error object:', JSON.stringify(error, null, 2));
     console.error('SQL State:', error.code);
+    console.error('Error message:', error.message);
     // CONTINUĂ chiar dacă migrațiile eșuează parțial
   } finally {
     client.release();
@@ -662,17 +664,30 @@ async function startServer() {
   console.log('🚀 Starting ELZR Hunt Backend...');
   console.log('📊 Environment:', process.env.NODE_ENV || 'development');
   console.log('🔌 Database URL:', process.env.DATABASE_PUBLIC_URL ? 'Set' : 'Not set');
-  
+
   try {
     // 1. Testează conexiunea la DB
-    const dbConnected = await testDatabaseConnection();
-    if (!dbConnected) {
-      console.log('⚠️  Continuing without database connection...');
+    let dbConnected = false;
+    try {
+      dbConnected = await testDatabaseConnection();
+    } catch (dbError) {
+      console.log('⚠️  Database connection test failed:', dbError.message);
     }
-    
-    // 2. Rulează migrațiile
-    await runMigrations();
-    
+
+    if (!dbConnected) {
+      console.log('⚠️  Attempting to continue without initial database connection...');
+    }
+
+    // 2. Rulează migrațiile (IMPORTANT: trebuie să ruleze mereu pentru a crea tabelele)
+    console.log('🔧 Running database migrations...');
+    try {
+      await runMigrations();
+      console.log('✅ Migrations completed');
+    } catch (migrationError) {
+      console.error('❌ Migrations failed:', migrationError.message);
+      console.log('⚠️  Continuing server startup despite migration failure...');
+    }
+
     // 3. Pornește serverul
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, '0.0.0.0', () => {
@@ -681,7 +696,7 @@ async function startServer() {
       console.log(`🩺 Health check: http://localhost:${PORT}/health`);
       console.log(`🗄️  DB test: http://localhost:${PORT}/test-db`);
     });
-    
+
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);

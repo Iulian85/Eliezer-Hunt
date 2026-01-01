@@ -11,7 +11,7 @@
     "node": "24.0.0"
   },
   "dependencies": {
-    "@google/generative-ai": "0.21.0",
+    "@google/generative-ai": "^0.21.0",
     "axios": "1.6.7",
     "bcryptjs": "2.4.3",
     "cors": "2.8.5",
