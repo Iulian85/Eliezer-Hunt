@@ -1,1 +1,11 @@
-{"deploy": {"workingDirectory": "railway-backend"}} 
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+    
+  },
+  "deploy": {
+    "startCommand": "npm run start",
+    "restartPolicyType": "ON_FAILURE"
+  }
+} 
