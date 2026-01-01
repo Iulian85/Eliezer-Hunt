@@ -226,7 +226,7 @@ app.use('/api/ai', aiRouter);
 
 // Basic endpoint
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'ELZR Hunt Backend API',
     status: 'running',
     timestamp: new Date().toISOString()
@@ -237,16 +237,16 @@ app.get('/', (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ 
+    res.json({
       status: 'healthy',
       database: 'connected',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       status: 'unhealthy',
       database: 'disconnected',
-      error: error.message 
+      error: error.message
     });
   }
 });
