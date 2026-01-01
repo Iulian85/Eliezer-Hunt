@@ -14,8 +14,8 @@ app.use(cors());
 
 // Database connection POOL (mai bun pentru Railway)
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionString: process.env.DATABASE_PUBLIC_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
 // Test database connection
@@ -83,7 +83,113 @@ async function runMigrations() {
       );
     `);
 
-    // Adaugă restul tabelelor...
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS campaigns (
+        id SERIAL PRIMARY KEY,
+        owner_wallet VARCHAR(255) NOT NULL,
+        target_lat DECIMAL(10, 8) NOT NULL,
+        target_lng DECIMAL(11, 8) NOT NULL,
+        count INTEGER DEFAULT 1,
+        multiplier INTEGER DEFAULT 1,
+        duration_days INTEGER DEFAULT 1,
+        expiry_date BIGINT,
+        total_price BIGINT DEFAULT 0,
+        brand_name VARCHAR(255),
+        logo_url TEXT,
+        video_url TEXT,
+        video_file_name TEXT,
+        contact_street VARCHAR(255),
+        contact_city VARCHAR(255),
+        contact_zip VARCHAR(50),
+        contact_country VARCHAR(100),
+        contact_phone VARCHAR(50),
+        contact_email VARCHAR(255),
+        contact_website VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'pending_review',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS hotspots (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        lat DECIMAL(10, 8) NOT NULL,
+        lng DECIMAL(11, 8) NOT NULL,
+        radius INTEGER DEFAULT 100,
+        density INTEGER DEFAULT 10,
+        category VARCHAR(50),
+        base_value BIGINT DEFAULT 100,
+        logo_url TEXT,
+        custom_text VARCHAR(100),
+        prizes TEXT, -- JSON array of numbers as text
+        video_url TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS withdrawal_requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount BIGINT NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        processed_at TIMESTAMP WITH TIME ZONE
+      );
+    `);
+
+    // Function to update updated_at timestamp
+    await client.query(`
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+      END;
+      $$ language 'plpgsql';
+    `);
+
+    // Trigger to update updated_at for users table
+    await client.query(`
+      CREATE TRIGGER update_users_updated_at
+          BEFORE UPDATE ON users
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+    `);
+
+    // Trigger to update updated_at for campaigns table
+    await client.query(`
+      CREATE TRIGGER update_campaigns_updated_at
+          BEFORE UPDATE ON campaigns
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+    `);
+
+    // Trigger to update updated_at for hotspots table
+    await client.query(`
+      CREATE TRIGGER update_hotspots_updated_at
+          BEFORE UPDATE ON hotspots
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+    `);
+
+    // Indexes for performance
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
+      CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
+      CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
+      CREATE INDEX IF NOT EXISTS idx_claims_user_id ON claims(user_id);
+      CREATE INDEX IF NOT EXISTS idx_claims_spawn_id ON claims(spawn_id);
+      CREATE INDEX IF NOT EXISTS idx_claims_created_at ON claims(created_at);
+      CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at);
+      CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
+      CREATE INDEX IF NOT EXISTS idx_campaigns_owner_wallet ON campaigns(owner_wallet);
+      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_user_id ON withdrawal_requests(user_id);
+      CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status ON withdrawal_requests(status);
+    `);
     
     console.log('Migrations completed successfully');
   } catch (error) {
@@ -96,7 +202,20 @@ async function runMigrations() {
 // API Routes - folosește pool în loc de db
 const usersRouter = require('./routes/users')(pool);
 const claimsRouter = require('./routes/claims')(pool);
-// ... restul routerelor
+const campaignsRouter = require('./routes/campaigns')(pool);
+const hotspotsRouter = require('./routes/hotspots')(pool);
+const withdrawalsRouter = require('./routes/withdrawals')(pool);
+const adminRouter = require('./routes/admin')(pool);
+const aiRouter = require('./routes/ai')(pool);
+
+// API routes
+app.use('/api/users', usersRouter);
+app.use('/api/claims', claimsRouter);
+app.use('/api/campaigns', campaignsRouter);
+app.use('/api/hotspots', hotspotsRouter);
+app.use('/api/withdrawals', withdrawalsRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/ai', aiRouter);
 
 // Basic endpoint
 app.get('/', (req, res) => {
@@ -132,10 +251,10 @@ async function startServer() {
   try {
     // Rulează migrațiile o singură dată
     await runMigrations();
-    
+
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📊 Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
+      console.log(`📊 Database: ${process.env.DATABASE_PUBLIC_URL ? 'Connected' : 'Not configured'}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

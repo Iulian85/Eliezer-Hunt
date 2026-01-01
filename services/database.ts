@@ -4,7 +4,7 @@ import { UserState, HotspotCategory } from "../types";
 // We'll implement functions that interact with the Express.js PostgreSQL backend
 
 // Base API URL for our Express.js backend
-const API_BASE = import.meta.env.VITE_RAILWAY_BACKEND_URL || "http://localhost:24101";
+const API_BASE = import.meta.env.VITE_RAILWAY_BACKEND_URL || "http://localhost:8080";
 
 // Helper function to make API requests
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
