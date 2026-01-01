@@ -24,7 +24,7 @@ app.use((req, res, next) => {
 
 // Database connection POOL (MUȘTE mai bun!)
 const pool = new Pool({
-  connectionString: process.env.DATABASE_PUBLIC_URL,
+  connectionString: process.env.DATABASE_URL,
   ssl: "prefer",
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000,
@@ -663,7 +663,7 @@ app.get('/test-db', async (req, res) => {
 async function startServer() {
   console.log('🚀 Starting ELZR Hunt Backend...');
   console.log('📊 Environment:', process.env.NODE_ENV || 'development');
-  console.log('🔌 Database URL:', process.env.DATABASE_PUBLIC_URL ? 'Set' : 'Not set');
+  console.log('🔌 Database URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
 
   try {
     // 1. Testează conexiunea la DB
