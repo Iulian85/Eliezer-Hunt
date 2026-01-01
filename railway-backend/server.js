@@ -23,8 +23,8 @@ app.use((req, res, next) => {
 
 // Database connection
 const db = new Client({
-  connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  connectionString: process.env.DATABASE_PUBLIC_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
 // Connect to database
@@ -458,7 +458,7 @@ async function runMigrations() {
   let migrationDb;
   try {
     console.log('Starting migration process...');
-    const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+    const connectionString = process.env.DATABASE_PUBLIC_URL;
     if (!connectionString) {
       console.warn('No database connection string. Skipping migrations.');
       return;
