@@ -15,9 +15,22 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS simplificat
+// CORS configurat pentru securitate
 const cors = require('cors');
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://eliezer-hunt-production.up.railway.app',
+    'https://t.me',  // Telegram Web Apps
+    'https://web.telegram.org',
+    'http://localhost:8080',  // Local development
+    'http://localhost:3000',  // Alternative local port
+    'http://localhost:5000',  // Vite default port
+    'http://localhost:5173',  // Vite default port
+    'https://*.railway.app'    // Orice subdomeniu Railway
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
 
 // Database connection POOL (mai bun pentru Railway)
 const pool = new Pool({
