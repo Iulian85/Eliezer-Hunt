@@ -1,9 +1,10 @@
 
-import { SpawnPoint, Coordinate, HotspotDefinition } from './types';
+import { SpawnPoint, HotspotDefinition } from './types.ts';
 
 // =================CONFIG=================
 const getEnv = (key: string) => {
     try {
+        // deno-lint-ignore ban-ts-comment
         // @ts-ignore
         return (import.meta.env && import.meta.env[key]) ? import.meta.env[key] : '';
     } catch {

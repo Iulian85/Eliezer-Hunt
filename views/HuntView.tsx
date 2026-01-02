@@ -1,20 +1,20 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Coordinate, SpawnPoint, HotspotDefinition } from '../types.ts';
-import { getDistance } from '../utils.ts';
-import { MAX_INTERACTION_DISTANCE, NEARBY_SEARCH_RADIUS } from '../constants.ts';
-import { Coin3D } from '../components/Coin3D.tsx';
+import { Coordinate, SpawnPoint, HotspotDefinition } from "../types.ts";
+import { getDistance } from "../utils.ts";
+import { MAX_INTERACTION_DISTANCE, NEARBY_SEARCH_RADIUS } from "../constants.ts";
+import { Coin3D } from "../components/Coin3D.tsx";
 import { LocateFixed, Navigation, Rocket, Crown, Gift, Megaphone } from 'lucide-react';
-import { ARView } from './ARView.tsx';
+import { ARView } from "./ARView.tsx";
 
-import { AmbientLight } from 'three';
+const AmbientLight = 'ambientLight' as any;
 
 interface HuntViewProps {
     location: Coordinate;
     spawns: SpawnPoint[];
     collectedIds: string[];
-    onCollect: (id: string, value: number, category?: HotspotCategory) => void;
+    onCollect: (id: string, value: number, category?: any) => void;
     hotspots: HotspotDefinition[];
 }
 
@@ -34,7 +34,7 @@ export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedI
             isLandmark: h.category === 'EVENT' || h.category === 'LANDMARK',
             logoUrl: h.logoUrl,
             customText: h.customText,
-            sponsorData: h.sponsorData
+            sponsorData: (h as any).sponsorData
         }));
 
         return [...spawns, ...hotspotSpawns];
@@ -62,7 +62,7 @@ export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedI
         }
     }, [location, allAvailableTargets, collectedIds, arMode]);
 
-    const handleARCollect = (points: number) => {
+    const handleARCollect = (points: number, tonReward: number = 0) => {
         if (nearestSpawn) {
             onCollect(nearestSpawn.spawn.id, points, nearestSpawn.spawn.category);
             // REPARAȚIE: NU apelăm setArMode(false). Utilizatorul rămâne în AR pentru următoarea monedă.
@@ -146,12 +146,11 @@ export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedI
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setArMode(true)}
+                    <button 
+                        onClick={() => setArMode(true)} 
                         className={`w-full py-4 mb-3 font-black rounded-2xl shadow-xl transform active:scale-95 transition-all flex items-center justify-center gap-3 text-sm uppercase tracking-widest
-                            ${nearestSpawn.dist < 200
-                                ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-blue-900/40"
+                            ${nearestSpawn.dist < 200 
+                                ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-blue-900/40" 
                                 : "bg-slate-800 text-slate-500 border border-slate-700 cursor-default"
                             }
                         `}
@@ -161,7 +160,7 @@ export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedI
                     </button>
                     
                     {nearestSpawn.dist <= MAX_INTERACTION_DISTANCE && (
-                        <button type="button" onClick={handleStandardCollect} className="w-full py-2 bg-slate-800/30 text-slate-500 text-[9px] font-black uppercase rounded-lg hover:bg-slate-800 transition-colors tracking-[0.3em]">
+                        <button onClick={handleStandardCollect} className="w-full py-2 bg-slate-800/30 text-slate-500 text-[9px] font-black uppercase rounded-lg hover:bg-slate-800 transition-colors tracking-[0.3em]">
                             Quick Collect (2D)
                         </button>
                     )}

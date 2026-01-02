@@ -1,14 +1,18 @@
 import React, { useEffect, useRef, useState, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { DeviceOrientationControls, PerspectiveCamera, Text, Billboard } from '@react-three/drei';
-import { AmbientLight, DirectionalLight, Group } from 'three';
-import { X, Loader2, CheckCircle, Gift, PackageOpen, Coins, Wallet, Camera, Zap } from 'lucide-react';
+import { X, Loader2, CheckCircle, Wind, Gift, RefreshCw, PackageOpen, Coins, Wallet, Camera, Zap } from 'lucide-react';
 import * as THREE from 'three';
-import { Coin3D } from '../components/Coin3D.tsx';
-import { SpawnPoint } from '../types.ts';
-import { showRewardedAd } from '../services/adsgram.ts';
-import { UniversalVideoPlayer } from '../components/UniversalVideoPlayer.tsx';
-import { ADSGRAM_BLOCK_ID } from '../constants.ts';
+import { Coin3D } from "../components/Coin3D.tsx";
+import { SpawnPoint } from "../types.ts";
+import { showRewardedAd } from "../services/adsgram.ts";
+import { UniversalVideoPlayer } from "../components/UniversalVideoPlayer.tsx";
+import { ADSGRAM_BLOCK_ID } from "../constants.ts";
+
+// Cast components to any to avoid intrinsic element type errors
+const AmbientLight = 'ambientLight' as any;
+const DirectionalLight = 'directionalLight' as any;
+const Group = 'group' as any;
 
 interface ARViewProps {
     target: { spawn: SpawnPoint, dist: number } | null;
@@ -79,29 +83,29 @@ export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect }) =>
         const startCamera = async () => {
             try {
                 // Ensure we request permissions as part of the initial mount
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-                    audio: false
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                    audio: false 
                 });
-
+                
                 if (mounted && videoRef.current) {
                     videoRef.current.srcObject = stream;
                     videoRef.current.setAttribute('playsinline', 'true');
                     videoRef.current.muted = true;
-
+                    
                     videoRef.current.onloadedmetadata = () => {
                         if (videoRef.current) {
                             videoRef.current.play()
                                 .then(() => {
                                     if (mounted) setCameraActive(true);
                                 })
-                                .catch((e: unknown) => console.warn("Camera auto-play blocked", e));
+                                .catch(e => console.warn("Camera auto-play blocked", e));
                         }
                     };
                 }
-            } catch (err) {
+            } catch (err) { 
                 console.error("AR: Camera Error", err);
-                if (mounted) setPermissionError(true);
+                if (mounted) setPermissionError(true); 
             }
         };
 
@@ -109,7 +113,7 @@ export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect }) =>
         return () => {
             mounted = false;
             if (stream) {
-                stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+                stream.getTracks().forEach(t => t.stop());
             }
         };
     }, []);
@@ -122,7 +126,7 @@ export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect }) =>
 
     const playSound = (type: 'success' | 'error' | 'prize') => {
         try {
-            const AudioContext = (globalThis.AudioContext || (globalThis as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
             const ctx = new AudioContext();
             const t = ctx.currentTime;
             const osc = ctx.createOscillator();
@@ -138,16 +142,14 @@ export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect }) =>
             }
             osc.start(t); osc.stop(t + 0.5);
             setTimeout(() => ctx.close(), 1000);
-        } catch (e) {
-            // Audio context error, ignore
-        }
+        } catch (e) {}
     };
 
     const triggerCollectionSuccess = (points: number, tonAmount: number) => {
         setCollecting(true);
-        setGbRevealed(false);
+        setGbRevealed(false); 
         playSound('success');
-        if (globalThis.Telegram?.WebApp?.HapticFeedback) globalThis.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
         onCollect(points, tonAmount);
     };
 
@@ -300,7 +302,7 @@ export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect }) =>
                              {cat === 'GIFTBOX' ? <Gift size={14}/> : <Zap size={14}/>} {target?.spawn.name || "Searching..."}
                         </p>
                     </div>
-                    <button type="button" onClick={onClose} className="bg-red-600/80 p-3 rounded-full text-white pointer-events-auto active:scale-90 shadow-xl"><X size={24} /></button>
+                    <button onClick={onClose} className="bg-red-600/80 p-3 rounded-full text-white pointer-events-auto active:scale-90 shadow-xl"><X size={24} /></button>
                 </div>
 
                 {gbRevealed && (wonTon !== null || wonPoints !== null) && (
@@ -334,8 +336,8 @@ export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect }) =>
 
             {playingSponsorAd && target?.spawn.sponsorData && (
                 <div className="fixed inset-0 z-[10020] bg-black flex flex-col pointer-events-auto">
-                    <UniversalVideoPlayer url={target!.spawn.sponsorData!.videoUrl} autoPlay className="flex-1" />
-                    <button type="button" onClick={() => { setPlayingSponsorAd(false); triggerCollectionSuccess(Math.floor(target.spawn.value), 0); }} className="m-6 bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-xs">Claim Reward</button>
+                    <UniversalVideoPlayer url={target!.spawn.sponsorData!.videoUrl} autoPlay={true} className="flex-1" />
+                    <button onClick={() => { setPlayingSponsorAd(false); triggerCollectionSuccess(Math.floor(target.spawn.value), 0); }} className="m-6 bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-xs">Claim Reward</button>
                 </div>
             )}
 

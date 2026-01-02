@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
-import { LeaderboardEntry } from '../types.ts';
+import { LeaderboardEntry } from "../types.ts";
 import { Trophy, Loader2, Award } from 'lucide-react';
 import { clsx } from 'clsx';
-import { getLeaderboard } from '../services/database.ts';
+import { getLeaderboard } from '../services/database';
 
 export const LeaderboardView: React.FC = () => {
     const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);

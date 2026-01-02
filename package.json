@@ -22,7 +22,6 @@
     "@tonconnect/ui-react": "^2.3.1",
     "clsx": "^2.1.0",
     "express": "^5.2.1",
-    "firebase": "^12.7.0",
     "git-filter-repo": "^0.0.30",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.344.0",

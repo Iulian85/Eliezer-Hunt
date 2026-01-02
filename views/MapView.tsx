@@ -2,8 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { Coordinate, SpawnPoint, HotspotCategory, HotspotDefinition } from '../types.ts';
-import { generateProceduralSpawns } from '../utils.ts';
+import { Coordinate, SpawnPoint, HotspotCategory, HotspotDefinition } from "../types.ts";
+import { generateProceduralSpawns } from "../utils.ts";
 
 // Added interface for MapView props
 interface MapViewProps {
@@ -65,7 +65,7 @@ const createStyledIcon = (category: HotspotCategory | undefined, densityValue: n
     });
 };
 
-const createIndividualCoinIcon = (_value: number) => L.divIcon({
+const createIndividualCoinIcon = (value: number) => L.divIcon({
     className: 'normal-coin-marker',
     html: `
         <div class="w-6 h-6 bg-amber-500 border-2 border-white rounded-full flex items-center justify-center shadow-lg">
@@ -75,7 +75,7 @@ const createIndividualCoinIcon = (_value: number) => L.divIcon({
     iconAnchor: [12, 12]
 });
 
-const MapEventsHandler = ({ onBoundsChange }: { onBoundsChange: (bounds: L.LatLngBounds, zoom: number) => void }) => {
+const MapEventsHandler = ({ onBoundsChange }: { onBoundsChange: (bounds: any, zoom: number) => void }) => {
     const map = useMapEvents({
         moveend: () => onBoundsChange(map.getBounds(), map.getZoom()),
         zoomend: () => onBoundsChange(map.getBounds(), map.getZoom())
@@ -83,7 +83,7 @@ const MapEventsHandler = ({ onBoundsChange }: { onBoundsChange: (bounds: L.LatLn
     return null;
 };
 
-export const MapView: React.FC<MapViewProps> = ({ location, _spawns, collectedIds, hotspots }) => {
+export const MapView: React.FC<MapViewProps> = ({ location, spawns, collectedIds, hotspots }) => {
     const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
     const [zoom, setZoom] = useState(15);
 
@@ -96,7 +96,7 @@ export const MapView: React.FC<MapViewProps> = ({ location, _spawns, collectedId
         if (!bounds) return [];
         const mapBounds = { north: bounds.getNorth(), south: bounds.getSouth(), east: bounds.getEast(), west: bounds.getWest() };
         const procedural = generateProceduralSpawns(mapBounds, zoom, hotspots);
-        return procedural.filter((s: SpawnPoint) => !collectedIds.includes(s.id));
+        return procedural.filter(s => !collectedIds.includes(s.id));
     }, [bounds, zoom, collectedIds, hotspots]);
 
     return (
@@ -107,7 +107,7 @@ export const MapView: React.FC<MapViewProps> = ({ location, _spawns, collectedId
                 
                 <Marker position={[location.lat, location.lng]} icon={L.divIcon({ className: 'u', html: `<div class="w-5 h-5 bg-cyan-400 rounded-full border-2 border-white shadow-[0_0_15px_rgba(34,211,238,0.8)]"></div>`, iconSize: [20,20] })} />
 
-                {visibleSpawns.map((s: SpawnPoint) => {
+                {visibleSpawns.map(s => {
                     const isMainHotspot = s.id.includes('main');
                     const isSpecial = s.category === 'EVENT' || s.category === 'LANDMARK' || s.category === 'MERCHANT';
                     

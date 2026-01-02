@@ -1,6 +1,6 @@
 import { UserState, HotspotCategory, LeaderboardEntry, Campaign, HotspotDefinition } from "../types.ts";
 
-interface WithdrawalRequest {
+export interface WithdrawalRequest {
   id: string;
   userId: string;
   amount: number;

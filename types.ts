@@ -151,6 +151,8 @@ export interface UserState {
     isAirdropped?: boolean;
     airdropAllocation?: number;
     airdropTimestamp?: number | null;
+    countryCode?: string;
+    banCount?: number;
 }
 
 export enum Tab {

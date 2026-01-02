@@ -1,20 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { TonConnectButton } from '@tonconnect/ui-react';
-import { Gift, Loader2, ShieldCheck, Coins, Megaphone, Sparkles, Clock, Users, Wallet, ArrowUpRight, Target, Crown } from 'lucide-react';
-import { showRewardedAd } from '../services/adsgram.ts';
-import { processWithdrawTON } from '../services/database.ts';
-import { REWARD_AD_VALUE, ADSGRAM_BLOCK_ID } from '../constants.ts';
-import { UserState } from '../types.ts';
+import { Gift, Loader2, ShieldCheck, Coins, TrendingUp, Megaphone, Star, Sparkles, Clock, Users, Wallet, ArrowUpRight, MapPin, Target, ShoppingBag, Crown } from 'lucide-react';
+import { showRewardedAd } from "../services/adsgram.ts";
+import { processWithdrawTON } from '../services/database';
+import { REWARD_AD_VALUE, ADSGRAM_BLOCK_ID } from "../constants.ts";
+import { UserState } from "../types.ts";
 
 interface WalletViewProps {
     userState: UserState;
     onAdReward: (amount: number) => void;
-    _onInvite: () => void;
+    onInvite: () => void;
 }
 
-export const WalletView: React.FC<WalletViewProps> = ({
-    userState, onAdReward, _onInvite
+export const WalletView: React.FC<WalletViewProps> = ({ 
+    userState, onAdReward, onInvite
 }) => {
     const [loadingAd, setLoadingAd] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
@@ -173,7 +173,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
                         <p className="text-[10px] text-slate-400">+500 Pts (Daily Supply) {timeRemaining && <span className="text-amber-500 font-bold ml-1">• {timeRemaining}</span>}</p>
                     </div>
                 </div>
-                <button type="button" onClick={handleWatchAd} disabled={loadingAd || !!timeRemaining} className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-lg active:scale-95 ${timeRemaining ? "bg-slate-800 text-slate-600 cursor-not-allowed" : "bg-white text-black hover:bg-slate-200"}`}>
+                <button onClick={handleWatchAd} disabled={loadingAd || !!timeRemaining} className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-lg active:scale-95 ${timeRemaining ? "bg-slate-800 text-slate-600 cursor-not-allowed" : "bg-white text-black hover:bg-slate-200"}`}>
                     {loadingAd ? <Loader2 className="animate-spin" size={14}/> : (timeRemaining ? "CLAIMED" : "CLAIM")}
                 </button>
             </div>
@@ -196,9 +196,8 @@ export const WalletView: React.FC<WalletViewProps> = ({
                         <p className="text-[9px] text-slate-500 uppercase mt-2 font-bold tracking-widest">Verified Multi-Chain Balance</p>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={handleWithdraw}
+                    <button 
+                        onClick={handleWithdraw} 
                         disabled={tonBalance < 10 || withdrawing}
                         className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl
                             ${tonBalance >= 10 ? 'bg-white text-blue-900 shadow-blue-400/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}
