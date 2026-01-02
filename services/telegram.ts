@@ -21,32 +21,19 @@ interface TelegramUserData {
 async function createHmacSha256(key: string, message: string): Promise<string> {
   // Create the secret key using the bot token
   const encoder = new TextEncoder();
-  const keyBuffer = encoder.encode('WebAppData');
   const botTokenBuffer = encoder.encode(key);
 
   // Import the key for HMAC operations
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
-    keyBuffer,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  // Sign the bot token with the key to get the secret
-  const secretBuffer = await crypto.subtle.sign('HMAC', cryptoKey, botTokenBuffer);
-
-  // Now sign the dataCheckString with the secret
-  const dataCheckKey = await crypto.subtle.importKey(
-    'raw',
-    secretBuffer,
+    botTokenBuffer,
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
   );
 
   const messageBuffer = encoder.encode(message);
-  const signature = await crypto.subtle.sign('HMAC', dataCheckKey, messageBuffer);
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageBuffer);
 
   // Convert to hex string
   return Array.from(new Uint8Array(signature))

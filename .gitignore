@@ -33,3 +33,6 @@ firebase-tools-instant-win.exe
 .env.local
 .env.development
 .env.production
+
+# Temporary files
+.temp

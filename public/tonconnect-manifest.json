@@ -1,8 +1,8 @@
 
 {
-  "url": "https://eliezer-hunt-production.up.railway.app/",
+  "url": "https://elzr-hunt.vercel.app/",  // Replace with your actual domain
   "name": "ELZR Hunt",
   "iconUrl": "https://raw.githubusercontent.com/Iulian85/eliezer-token/main/ELZR.png",
-  "termsOfUseUrl": "https://eliezer-hunt-production.up.railway.app/terms",
-  "privacyPolicyUrl": "https://eliezer-hunt-production.up.railway.app/privacy"
+  "termsOfUseUrl": "https://elzr-hunt.vercel.app/terms",  // Replace with your actual domain
+  "privacyPolicyUrl": "https://elzr-hunt.vercel.app/privacy"  // Replace with your actual domain
 }

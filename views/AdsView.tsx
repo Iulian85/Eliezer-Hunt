@@ -1,16 +1,16 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
 import { MapContainer, TileLayer, Marker, Circle } from 'react-leaflet';
 import L from 'leaflet';
-import { Megaphone, MapPin, Video, Loader2, Clock, AlertCircle, Wallet, Image as ImageIcon, Calendar, Info, CheckCircle2, Search, Navigation, Building, ArrowRight, FlaskConical, Globe, Mail, Phone, Settings, BarChart3, TrendingUp, CreditCard, ChevronRight } from 'lucide-react';
-import { Coordinate, AdStatus, Campaign, ContactInfo } from '../types';
+import { Megaphone, MapPin, Video, Loader2, Clock, AlertCircle, Wallet, CheckCircle2, Navigation, Building, FlaskConical, Settings, CreditCard, TrendingUp } from 'lucide-react';
+import { Coordinate, AdStatus, Campaign, ContactInfo } from '../types.ts';
 
 interface AdsViewProps {
     userLocation: Coordinate | null;
     collectedIds: string[];
     myCampaigns: Campaign[];
-    onSubmitApplication: (coords: Coordinate, count: number, multiplier: number, price: number, sponsorData: any) => void;
+    onSubmitApplication: (coords: Coordinate, count: number, multiplier: number, price: number, sponsorData: { brandName: string, logoUrl: string, videoUrl: string, multiplier: number, durationDays: number, contact: ContactInfo, status: AdStatus }) => void;
     onPayCampaign: (campaignId: string) => void;
     isTestMode?: boolean; 
 }
@@ -22,7 +22,7 @@ const simplePinIcon = L.divIcon({
     iconAnchor: [16, 32]
 });
 
-export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, myCampaigns, onSubmitApplication, onPayCampaign, isTestMode = false }) => {
+export const AdsView: React.FC<AdsViewProps> = ({ _userLocation, collectedIds, myCampaigns, onSubmitApplication, onPayCampaign, isTestMode = false }) => {
     const [tonConnectUI] = useTonConnectUI();
     const userAddress = useTonAddress();
 
@@ -90,7 +90,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
             } else {
                 setGeoError("The address was not found. Please check the details.");
             }
-        } catch (e) {
+        } catch (_e) {
             setGeoError("Map service error.");
         } finally {
             setIsGeocoding(false);
@@ -98,22 +98,22 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
     };
 
     const handleUseMyLocation = () => {
-        if (!navigator.geolocation) {
+        if (!(navigator as any).geolocation) {
             setGeoError("GPS unavailable.");
             return;
         }
         setIsLocating(true);
         setGeoError(null);
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
+        (navigator as any).geolocation.getCurrentPosition(
+            (pos: GeolocationPosition) => {
                 const myCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setResolvedLocation(myCoords);
                 setIsLocating(false);
-                if (window.Telegram?.WebApp?.HapticFeedback) {
-                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                if ((globalThis as any).Telegram?.WebApp?.HapticFeedback) {
+                    (globalThis as any).Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 }
             },
-            (err) => {
+            (err: GeolocationPositionError) => {
                 setIsLocating(false);
                 setGeoError("GPS permission denied.");
             },
@@ -121,7 +121,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
         );
     };
 
-    const handleSubmitApp = async () => {
+    const handleSubmitApp = () => {
         if (!userAddress) { alert("Please connect your TON wallet."); return; }
         if (!brandName || !videoUrl || !logoUrl) { alert("Please fill in the required fields."); return; }
         if (!resolvedLocation) { alert("Check the location on the map."); return; }
@@ -141,7 +141,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
             // Reset form
             setBrandName(''); setWebsite(''); setEmail(''); setPhone(''); setStreet(''); setCity(''); setZip(''); setCountry(''); setLogoUrl(''); setVideoUrl(''); setResolvedLocation(null);
             setActiveSection('manage');
-        } catch (e) {
+        } catch (_e) {
             alert("Error sending request.");
         } finally {
             setIsSubmitting(false);
@@ -158,12 +158,12 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
                 return;
             }
             // Obține adresa de admin de pe server prin funcția Database
-            const { getAdminWallet } = await import('../services/database');
-            const result = await getAdminWallet();
-            if (!result || !result.adminWalletAddress) {
+            const { getAdminWallet } = await import('../services/database.ts');
+            const result: { address: string; balance: number } | null = await getAdminWallet();
+            if (!result || !result.address) {
                 throw new Error('Could not fetch admin wallet address');
             }
-            const adminWalletAddress = result.adminWalletAddress;
+            const adminWalletAddress = result.address;
 
             const transaction = {
                 validUntil: Math.floor(Date.now() / 1000) + 600,
@@ -174,7 +174,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
             };
             await tonConnectUI.sendTransaction(transaction);
             onPayCampaign(campaign.id);
-        } catch (e) {
+        } catch (_e) {
             alert("The payment was canceled or failed.");
         } finally {
             setIsPaying(null);
@@ -195,8 +195,8 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
     return (
         <div className="h-full w-full bg-slate-950 flex flex-col relative">
             <div className="flex border-b border-slate-800 bg-slate-900 z-20">
-                <button onClick={() => setActiveSection('create')} className={`flex-1 py-4 text-xs font-black uppercase tracking-widest ${activeSection === 'create' ? 'text-white border-b-2 border-cyan-500 bg-cyan-500/5' : 'text-slate-500'}`}>New Campaign</button>
-                <button onClick={() => setActiveSection('manage')} className={`flex-1 py-4 text-xs font-black uppercase tracking-widest ${activeSection === 'manage' ? 'text-white border-b-2 border-cyan-500 bg-cyan-500/5' : 'text-slate-500'} flex justify-center items-center gap-2`}>
+                <button type="button" onClick={() => setActiveSection('create')} className={`flex-1 py-4 text-xs font-black uppercase tracking-widest ${activeSection === 'create' ? 'text-white border-b-2 border-cyan-500 bg-cyan-500/5' : 'text-slate-500'}`}>New Campaign</button>
+                <button type="button" onClick={() => setActiveSection('manage')} className={`flex-1 py-4 text-xs font-black uppercase tracking-widest ${activeSection === 'manage' ? 'text-white border-b-2 border-cyan-500 bg-cyan-500/5' : 'text-slate-500'} flex justify-center items-center gap-2`}>
                     Management
                     {myCampaigns.some(c => c.data.status === AdStatus.PAYMENT_REQUIRED) && <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>}
                 </button>
@@ -210,25 +210,25 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                             <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-800"><h3 className="text-[10px] font-black text-slate-300 flex items-center gap-2 uppercase tracking-widest"><Building size={14} className="text-cyan-400" /> Business Profile</h3></div>
                             <div className="p-4 space-y-4">
-                                <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block tracking-widest">Brand Name *</label><input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="Your Company" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:border-cyan-500 outline-none" /></div>
+                                <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block tracking-widest">Brand Name *</label><input type="text" value={brandName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBrandName(e.target.value)} placeholder="Your Company" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:border-cyan-500 outline-none" /></div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block">Website</label><input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="site.com" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none" /></div>
-                                    <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="office@..." className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none" /></div>
+                                    <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block">Website</label><input type="text" value={website} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWebsite(e.target.value)} placeholder="site.com" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none" /></div>
+                                    <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block">Email</label><input type="email" value={email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} placeholder="office@..." className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none" /></div>
                                 </div>
                                 <div className="border-t border-slate-800 my-2"></div>
                                 <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><MapPin size={12} className="text-red-500" /> Dropzone Location</h4>
                                 <div className="space-y-3">
-                                    <input type="text" value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Street, Nr." className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:border-red-500 outline-none" />
+                                    <input type="text" value={street} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStreet(e.target.value)} placeholder="Street, Nr." className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:border-red-500 outline-none" />
                                     <div className="grid grid-cols-2 gap-3">
-                                        <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none" />
-                                        <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Country" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none" />
+                                        <input type="text" value={city} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCity(e.target.value)} placeholder="City" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none" />
+                                        <input type="text" value={country} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCountry(e.target.value)} placeholder="Country" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none" />
                                     </div>
                                 </div>
                                 <div className="flex gap-2 mt-2">
-                                    <button onClick={handleVerifyLocation} disabled={isGeocoding} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-red-900/20">
+                                    <button type="button" onClick={handleVerifyLocation} disabled={isGeocoding} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-red-900/20">
                                         {isGeocoding ? <Loader2 className="animate-spin" size={14}/> : <CheckCircle2 size={14}/>} Check Address
                                     </button>
-                                    <button onClick={handleUseMyLocation} disabled={isLocating} className={`p-2.5 rounded-xl border border-slate-700 flex items-center justify-center transition-all active:scale-95 ${isLocating ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-cyan-400 shadow-lg shadow-black/40'}`}>
+                                    <button type="button" onClick={handleUseMyLocation} disabled={isLocating} className={`p-2.5 rounded-xl border border-slate-700 flex items-center justify-center transition-all active:scale-95 ${isLocating ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-cyan-400 shadow-lg shadow-black/40'}`}>
                                         {isLocating ? <Loader2 className="animate-spin" size={20} /> : <Navigation size={20} />}
                                     </button>
                                 </div>
@@ -249,8 +249,8 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
 
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-4">
                             <h3 className="text-[10px] font-black text-slate-300 flex items-center gap-2 uppercase tracking-widest border-b border-slate-800 pb-2 mb-2"><Video size={14} className="text-purple-400" /> Active Media Assets</h3>
-                            <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block">Logo Image URL</label><input type="text" placeholder="https://..." value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-purple-500" /></div>
-                            <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block">Video Campaign URL</label><input type="text" placeholder="https://..." value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-purple-500" /></div>
+                            <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block">Logo Image URL</label><input type="text" placeholder="https://..." value={logoUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLogoUrl(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-purple-500" /></div>
+                            <div><label className="text-[9px] text-slate-500 font-black uppercase mb-1 block">Video Campaign URL</label><input type="text" placeholder="https://..." value={videoUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVideoUrl(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-purple-500" /></div>
                         </div>
 
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-6">
@@ -263,7 +263,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
                                 <label className="text-[10px] text-slate-400 font-black uppercase mb-3 block tracking-tighter">Visibility Multiplier</label>
                                 <div className="grid grid-cols-4 gap-2">
                                     {[5, 10, 20, 50].map(val => (
-                                        <button key={val} onClick={() => setMultiplier(val)} className={`py-2 rounded-xl text-[10px] font-black border transition-all ${multiplier === val ? "bg-amber-500 border-amber-400 text-black shadow-lg shadow-amber-900/20" : "bg-slate-950 border-slate-800 text-slate-500"}`}>{val}X</button>
+                                        <button type="button" key={val} onClick={() => setMultiplier(val)} className={`py-2 rounded-xl text-[10px] font-black border transition-all ${multiplier === val ? "bg-amber-500 border-amber-400 text-black shadow-lg shadow-amber-900/20" : "bg-slate-950 border-slate-800 text-slate-500"}`}>{val}X</button>
                                     ))}
                                 </div>
                             </div>
@@ -278,7 +278,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
                                         { val: 7, label: '7 DAYS', desc: 'Active Week' }, 
                                         { val: 30, label: '1 MONTH', desc: 'Pro Presence' }
                                     ].map(opt => (
-                                        <button key={opt.val} onClick={() => setDuration(opt.val)} className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center transition-all ${duration === opt.val ? "bg-cyan-600 border-cyan-400 text-white shadow-lg shadow-cyan-900/40" : "bg-slate-950 border-slate-800 text-slate-500"}`}>
+                                        <button type="button" key={opt.val} onClick={() => setDuration(opt.val)} className={`py-3 px-1 rounded-xl border flex flex-col items-center justify-center transition-all ${duration === opt.val ? "bg-cyan-600 border-cyan-400 text-white shadow-lg shadow-cyan-900/40" : "bg-slate-950 border-slate-800 text-slate-500"}`}>
                                             <span className="text-xs font-black">{opt.label}</span>
                                             <span className={`text-[7px] uppercase font-bold mt-0.5 ${duration === opt.val ? 'text-cyan-100' : 'text-slate-700'}`}>{opt.desc}</span>
                                         </button>
@@ -308,7 +308,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
                                             <span className="text-4xl font-black text-white font-[Rajdhani]">{pricing.total} <span className="text-lg text-cyan-500 ml-1.5 uppercase">TON</span></span>
                                         </div>
                                     </div>
-                                    <button onClick={handleSubmitApp} disabled={isSubmitting || !resolvedLocation} className="w-full py-4.5 bg-white text-black hover:bg-slate-200 disabled:opacity-50 font-black rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-[0_0_30px_rgba(255,255,255,0.15)] uppercase tracking-widest text-sm">
+                                    <button type="button" onClick={handleSubmitApp} disabled={isSubmitting || !resolvedLocation} className="w-full py-4.5 bg-white text-black hover:bg-slate-200 disabled:opacity-50 font-black rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-[0_0_30px_rgba(255,255,255,0.15)] uppercase tracking-widest text-sm">
                                         {isSubmitting ? <Loader2 className="animate-spin" /> : <Megaphone size={20} />} Submit Campaign
                                     </button>
                                     <p className="text-center text-[8px] text-slate-600 mt-4 font-bold uppercase tracking-widest">Approved ads appear globally within 12-24 hours</p>
@@ -373,7 +373,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
                                                 </div>
                                             </div>
                                             {camp.data.status === AdStatus.PAYMENT_REQUIRED && (
-                                                <button onClick={() => handlePayment(camp)} disabled={isPaying === camp.id} className="w-full py-3.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] transition-all active:scale-[0.98] uppercase tracking-widest text-xs">
+                                                <button type="button" onClick={() => handlePayment(camp)} disabled={isPaying === camp.id} className="w-full py-3.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-3 hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] transition-all active:scale-[0.98] uppercase tracking-widest text-xs">
                                                     {isPaying === camp.id ? <Loader2 className="animate-spin" /> : <Wallet size={18} />} {isTestMode ? "Simulate Payment (Test)" : `Pay ${camp.totalPrice} TON`}
                                                 </button>
                                             )}

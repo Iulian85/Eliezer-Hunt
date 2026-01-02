@@ -1,9 +1,9 @@
 
-import { UserState } from '../types';
+import { UserState } from '../types.ts';
 
 /**
  * STORAGE SERVICE DEACTIVATED
- * All data must persist ONLY in PostgreSQL via Railway backend to prevent client-side balance manipulation.
+ * All data must persist ONLY in PostgreSQL via Supabase backend to prevent client-side balance manipulation.
  */
 
 export const loadState = (): UserState | null => {

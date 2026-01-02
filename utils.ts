@@ -1,5 +1,5 @@
 
-import { Coordinate, SpawnPoint, HotspotDefinition } from './types';
+import { Coordinate, SpawnPoint, HotspotDefinition } from './types.ts';
 
 export function getDistance(p1: Coordinate, p2: Coordinate): number {
     const R = 6371e3;
@@ -58,7 +58,7 @@ export function generateProceduralSpawns(bounds: { north: number, south: number,
                             description: 'PROMOTIONAL DROP',
                             logoUrl: hotspot.logoUrl,
                             customText: hotspot.customText,
-                            sponsorData: (hotspot as any).sponsorData
+                            sponsorData: (hotspot as HotspotDefinition & { sponsorData?: any }).sponsorData
                         });
                     }
                 } else {

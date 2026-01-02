@@ -8,10 +8,19 @@ declare global {
     }
 }
 
+// Define a type for the global Adsgram object
+type GlobalWithAdsgram = typeof globalThis & {
+    Adsgram?: {
+        init: (params: { blockId: string }) => {
+            show: () => Promise<void>;
+        };
+    };
+};
+
 // Helper to dynamically load the script if missing
 const loadAdsgramScript = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if (window.Adsgram) {
+    return new Promise<void>((resolve, reject) => {
+        if ((globalThis as GlobalWithAdsgram).Adsgram) {
             resolve();
             return;
         }
@@ -38,18 +47,19 @@ export const showRewardedAd = async (blockId: string): Promise<boolean> => {
 
         await loadAdsgramScript();
 
-        if (!window.Adsgram) {
+        const globalWithAdsgram = globalThis as GlobalWithAdsgram;
+        if (!globalWithAdsgram.Adsgram) {
             return false;
         }
 
-        const AdController = window.Adsgram.init({
+        const AdController = globalWithAdsgram.Adsgram.init({
             blockId
         });
 
         await AdController.show();
         return true;
 
-    } catch (error) {
+    } catch (_error) {
         return false;
     }
 };

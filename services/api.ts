@@ -1,6 +1,6 @@
-import { User } from '../types';
+import { User } from '../types.ts';
 
-const API_BASE = process.env.VITE_BUN_FUNCTION_URL || process.env.VITE_RAILWAY_BACKEND_URL || 'http://localhost:8080/api';
+const API_BASE = import.meta.env.VITE_SUPABASE_PROJECT_URL ? `${import.meta.env.VITE_SUPABASE_PROJECT_URL}/functions/v1` : 'http://localhost:8080/api';
 
 interface CollectData {
   userId: number;
@@ -21,6 +21,36 @@ interface UpdateBalanceData {
   merchantBalance?: number;
   referralBalance?: number;
   collectedIds?: string[];
+}
+
+interface ClaimResponse {
+  id: string;
+  userId: number;
+  spawnId: string;
+  value: number;
+  category: string;
+  claimedAt: string;
+  tonReward?: number;
+}
+
+interface AdWatchResponse {
+  success: boolean;
+  rewardAmount: number;
+  newBalance: number;
+}
+
+interface DailyRewardResponse {
+  success: boolean;
+  rewardAmount: number;
+  newBalance: number;
+  lastClaimDate: string;
+}
+
+interface TelegramVerificationResponse {
+  success: boolean;
+  telegramId: string;
+  authDate: number;
+  hash: string;
 }
 
 export const api = {
@@ -64,7 +94,7 @@ export const api = {
   },
 
   // Collect item/coin
-  collect: async (collectData: CollectData): Promise<{ claim: any }> => {
+  collect: async (collectData: CollectData): Promise<{ claim: ClaimResponse }> => {
     const response = await fetch(`${API_BASE}/collect`, {
       method: 'POST',
       headers: {
@@ -79,7 +109,7 @@ export const api = {
   },
 
   // Watch ad and earn points
-  watchAd: async (telegramId: string, rewardAmount?: number): Promise<any> => {
+  watchAd: async (telegramId: string, rewardAmount?: number): Promise<AdWatchResponse> => {
     const response = await fetch(`${API_BASE}/users/${telegramId}/watch-ad`, {
       method: 'POST',
       headers: {
@@ -94,7 +124,7 @@ export const api = {
   },
 
   // Watch sponsored ad
-  watchSponsoredAd: async (telegramId: string, rewardAmount?: number): Promise<any> => {
+  watchSponsoredAd: async (telegramId: string, rewardAmount?: number): Promise<AdWatchResponse> => {
     const response = await fetch(`${API_BASE}/users/${telegramId}/watch-sponsored-ad`, {
       method: 'POST',
       headers: {
@@ -109,7 +139,7 @@ export const api = {
   },
 
   // Claim daily reward
-  claimDailyReward: async (telegramId: string): Promise<any> => {
+  claimDailyReward: async (telegramId: string): Promise<DailyRewardResponse> => {
     const response = await fetch(`${API_BASE}/dailyReward`, {
       method: 'POST',
       headers: {
@@ -124,7 +154,7 @@ export const api = {
   },
 
   // Verify Telegram user (if needed)
-  verifyTelegram: async (initData: string): Promise<any> => {
+  verifyTelegram: async (initData: string): Promise<TelegramVerificationResponse> => {
     const response = await fetch(`${API_BASE}/verifyTelegram`, {
       method: 'POST',
       headers: {

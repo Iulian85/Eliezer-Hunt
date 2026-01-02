@@ -1,13 +1,24 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Campaign, AdStatus, HotspotDefinition, HotspotCategory, Coordinate } from '../types';
+import { Campaign, AdStatus, HotspotDefinition, HotspotCategory, Coordinate, UserState } from '../types.ts';
+
+interface WithdrawalRequest {
+  id: string;
+  userId: string;
+  amount: number;
+  status: string;
+  createdAt: number;
+  updatedAt: number;
+  walletAddress?: string;
+  timestamp?: number;
+}
 // Added CheckCircle2 to the import list from lucide-react
-import { ShieldCheck, Check, X, Play, Clock, AlertTriangle, Users, Ban, Wallet, Globe, Search, Lock, Unlock, LayoutDashboard, Megaphone, BarChart3, Settings, Trash2, UserX, FlaskConical, MapPin, Plus, Edit2, Coins, Map as MapIcon, Upload, Image as ImageIcon, Loader2, Gift, Calendar, Activity, History, RotateCcw, AlertCircle, Fingerprint, RefreshCw, Send, Target, Crown, Sparkles, UserCheck, CreditCard, ArrowUpRight, CheckCircle2 } from 'lucide-react';
-import { UniversalVideoPlayer } from '../components/UniversalVideoPlayer';
+import { ShieldCheck, Check, X, Play, Clock, AlertTriangle, Users, Wallet, Globe, Search, Lock, Unlock, Megaphone, Trash2, UserX, MapPin, Plus, Edit2, Coins, Map as MapIcon, Upload, Loader2, Gift, Calendar, Activity, History, RotateCcw, AlertCircle, Fingerprint, Send, UserCheck, CreditCard, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { UniversalVideoPlayer } from '../components/UniversalVideoPlayer.tsx';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
-import { getAllUsersAdmin, deleteUserDatabase, toggleUserBan, resetUserInDatabase, toggleUserBiometricSetting, markUserAirdropped, subscribeToWithdrawalRequests, updateWithdrawalStatus } from '../services/database';
+import { getAllUsersAdmin, deleteUserDatabase, toggleUserBan, resetUserInDatabase, toggleUserBiometricSetting, markUserAirdropped, subscribeToWithdrawalRequests, updateWithdrawalStatus } from '../services/database.ts';
 
 interface AdminViewProps {
     allCampaigns: Campaign[];
@@ -37,10 +48,18 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const [tonConnectUI] = useTonConnectUI();
     const adminAddress = useTonAddress();
     const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'ads' | 'hotspots' | 'giftboxes' | 'airdrop' | 'payments' | 'system'>('dashboard');
-    const [users, setUsers] = useState<any[]>([]);
-    const [withdrawals, setWithdrawals] = useState<any[]>([]);
-    const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    interface AdminUser extends UserState {
+        countryCode?: string;
+        ipAddress?: string;
+        joinedAt?: number;
+        lastActive?: number;
+        banCount?: number;
+    }
+
+    const [users, setUsers] = useState<AdminUser[]>([]);
+    const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+    const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
+    const [searchQuery, setSearchQuery] = useState<string>('');
     const [previewVideo, setPreviewVideo] = useState<string | null>(null);
     const [isProcessingAirdrop, setIsProcessingAirdrop] = useState<string | null>(null);
     const [isExecutingPayment, setIsExecutingPayment] = useState<string | null>(null);
@@ -71,23 +90,24 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
     const loadUsers = async () => {
         setIsLoadingUsers(true);
-        const data = await getAllUsersAdmin();
+        const data: AdminUser[] = await getAllUsersAdmin();
         setUsers(data);
         setIsLoadingUsers(false);
     };
 
-    const formatDate = (ts?: any) => {
+    const formatDate = (ts?: { toDate: () => Date } | Date | number | null) => {
         if (!ts) return 'N/A';
-        const date = ts.toDate ? ts.toDate() : new Date(ts);
+        const date = 'toDate' in ts ? ts.toDate() : new Date(ts as Date | number);
         return new Intl.DateTimeFormat('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
     };
 
-    const handleProcessPayment = async (req: any) => {
-        const user = users.find(u => u.id === String(req.userId));
+    const handleProcessPayment = async (req: WithdrawalRequest) => {
+        const userId = parseInt(req.userId);
+        const user = users.find(u => u.telegramId === userId);
         if (!user || !user.walletAddress) return alert("User wallet missing.");
         if (!adminAddress) return alert("Please connect Admin Wallet first.");
 
-        if (window.confirm(`PAYMENT PROTOCOL: Send ${req.amount} TON to ${user.username || user.id}? This will open Tonkeeper.`)) {
+        if (globalThis.confirm(`PAYMENT PROTOCOL: Send ${req.amount} TON to ${user.username || user.telegramId?.toString()}? This will open Tonkeeper.`)) {
             setIsExecutingPayment(req.id);
             try {
                 const transaction = {
@@ -115,15 +135,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
     };
 
     const handleDeleteUser = async (id: string) => {
-        if (window.confirm(`CRITICAL WARNING: Permanently delete user ${id}? This action IS IRREVERSIBLE.`)) {
-            await deleteUserDatabase(id);
-            setUsers(prev => prev.filter(u => u.id !== id));
+        const userId = parseInt(id);
+        if (globalThis.confirm(`CRITICAL WARNING: Permanently delete user ${id}? This action IS IRREVERSIBLE.`)) {
+            await deleteUserDatabase(userId.toString());
+            setUsers(prev => prev.filter(u => u.telegramId !== userId));
         }
     };
 
     const handleResetUserAccount = async (id: string) => {
-        if (window.confirm(`ACCOUNT RESET: Clear all extraction progress for user ${id}?`)) {
-            await resetUserInDatabase(parseInt(id));
+        const userId = parseInt(id);
+        if (globalThis.confirm(`ACCOUNT RESET: Clear all extraction progress for user ${id}?`)) {
+            await resetUserInDatabase(userId);
             alert("Account progress has been reset.");
             loadUsers();
         }
@@ -131,29 +153,31 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
     const handleToggleBan = async (id: string, currentStatus: boolean) => {
         const newStatus = !currentStatus;
-        if (window.confirm(newStatus ? `LOCK ACCOUNT: Block user ${id}?` : `UNLOCK ACCOUNT: Restore access for user ${id}?`)) {
-            await toggleUserBan(id, newStatus);
-            setUsers(prev => prev.map(u => u.id === id ? { ...u, isBanned: newStatus } : u));
+        const userId = parseInt(id);
+        if (globalThis.confirm(newStatus ? `LOCK ACCOUNT: Block user ${id}?` : `UNLOCK ACCOUNT: Restore access for user ${id}?`)) {
+            await toggleUserBan(userId.toString(), newStatus);
+            setUsers(prev => prev.map(u => u.telegramId === userId ? { ...u, isBanned: newStatus } : u));
         }
     };
 
     const handleToggleBiometric = async (id: string, currentStatus: boolean) => {
         const newStatus = !currentStatus;
+        const userId = parseInt(id);
         const msg = newStatus
             ? `ENABLE SECURITY: Mandatory biometric lock for user ${id}?`
             : `DISABLE SECURITY: Allow user ${id} to bypass biometric login (Use for Desktop/Testing)?`;
-       
-        if (window.confirm(msg)) {
-            await toggleUserBiometricSetting(id, newStatus);
-            setUsers(prev => prev.map(u => u.id === id ? { ...u, biometricEnabled: newStatus } : u));
+
+        if (globalThis.confirm(msg)) {
+            await toggleUserBiometricSetting(userId.toString(), newStatus);
+            setUsers(prev => prev.map(u => u.telegramId === userId ? { ...u, biometricEnabled: newStatus } : u));
         }
     };
 
-    const handleExecuteAirdrop = async (user: any, allocation: number) => {
+    const handleExecuteAirdrop = async (user: AdminUser, allocation: number) => {
         if (!user.walletAddress) return alert("User has no wallet connected.");
-        if (window.confirm(`EXECUTE AIRDROP: Send ${allocation.toFixed(8)} $ELZR directly to address ${user.walletAddress}?`)) {
-            setIsProcessingAirdrop(user.id);
-            const success = await markUserAirdropped(user.id, allocation);
+        if (globalThis.confirm(`EXECUTE AIRDROP: Send ${allocation.toFixed(8)} $ELZR directly to address ${user.walletAddress}?`)) {
+            setIsProcessingAirdrop(user.telegramId?.toString());
+            const success = await markUserAirdropped(user.telegramId?.toString() || '', allocation);
             setIsProcessingAirdrop(null);
             if (success) {
                 alert("Airdrop Protocol Successful. TON Minter transaction initiated.");
@@ -165,13 +189,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
+        const files = (e.target as HTMLInputElement).files as FileList | null;
+        const file = files?.[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => {
-            const img = new Image();
+            const img = new (globalThis as typeof globalThis & { Image: typeof Image }).Image();
             img.onload = () => {
-                const canvas = document.createElement('canvas');
+                const canvas = (globalThis as typeof globalThis & { document: Document }).document.createElement('canvas');
                 const MAX_SIZE = 128;
                 let width = img.width;
                 let height = img.height;
@@ -184,7 +209,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 const ctx = canvas.getContext('2d');
                 ctx?.drawImage(img, 0, 0, width, height);
                 const base64 = canvas.toDataURL('image/png', 0.7);
-                setHForm(prev => ({ ...prev, logoUrl: base64 }));
+                setHForm((prev: Partial<HotspotDefinition>) => ({ ...prev, logoUrl: base64 }));
             };
             img.src = event.target?.result as string;
         };
@@ -227,12 +252,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
     const togglePrize = (val: number) => {
         const current = gbForm.prizes || [];
-        if (current.includes(val)) setGbForm({...gbForm, prizes: current.filter(v => v !== val)});
+        if (current.includes(val)) setGbForm({...gbForm, prizes: current.filter((v: number) => v !== val)});
         else setGbForm({...gbForm, prizes: [...current, val]});
     };
 
     const handleDeleteHotspot = (id: string) => {
-        if (window.confirm(`Sunteți sigur că doriți să ȘTERGEȚI DEFINITIV hotspot-ul "${id}"?`)) {
+        if (globalThis.confirm(`Sunteți sigur că doriți să ȘTERGEȚI DEFINITIV hotspot-ul "${id}"?`)) {
             onDeleteHotspot(id);
         }
     };
@@ -252,7 +277,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const filteredUsers = useMemo(() => {
         return users.filter(u =>
             (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (u.id || '').toLowerCase().includes(searchQuery.toLowerCase())
+            (u.telegramId?.toString() || '').toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [users, searchQuery]);
 
@@ -317,7 +342,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                     <UniversalVideoPlayer url={campaign.data.videoUrl} autoPlay className="w-full h-full object-contain" />
                                 ) : (
                                     <div className="flex flex-col items-center justify-center h-full gap-2">
-                                        <button onClick={() => setPreviewVideo(campaign.id)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all">
+                                        <button type="button" onClick={() => setPreviewVideo(campaign.id ?? null)} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all">
                                             <Play size={20} fill="currentColor" />
                                         </button>
                                         <span className="text-[10px] text-slate-500 font-bold uppercase">Preview Campaign Video</span>
@@ -337,15 +362,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             <div className="flex gap-2">
                                 {campaign.data.status === AdStatus.PENDING_REVIEW && (
                                     <>
-                                        <button onClick={() => onApprove(campaign.id)} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2">
+                                        <button type="button" onClick={() => onApprove(campaign.id)} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2">
                                             <Check size={14} /> APPROVE
                                         </button>
-                                        <button onClick={() => onReject(campaign.id)} className="flex-1 bg-red-600/20 border border-red-600/30 text-red-500 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2">
+                                        <button type="button" onClick={() => onReject(campaign.id)} className="flex-1 bg-red-600/20 border border-red-600/30 text-red-500 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2">
                                             <X size={14} /> REJECT
                                         </button>
                                     </>
                                 )}
-                                <button onClick={() => { if(window.confirm('Stergi campania definitiv?')) onDeleteCampaign(campaign.id); }} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl hover:text-red-500 transition-colors">
+                                <button type="button" onClick={() => { if(globalThis.confirm('Stergi campania definitiv?')) onDeleteCampaign(campaign.id); }} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl hover:text-red-500 transition-colors">
                                     <Trash2 size={18} />
                                 </button>
                             </div>
@@ -367,17 +392,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">ID (Unique Key) *</label>
-                            <input disabled={!!isEditingHotspot} type="text" value={hForm.id} onChange={e => setHForm({...hForm, id: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-cyan-500" placeholder="e.g. ny-park" />
+                            <input disabled={!!isEditingHotspot} type="text" value={hForm.id || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHForm({...hForm, id: (e.target as HTMLInputElement).value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-cyan-500" placeholder="e.g. ny-park" />
                         </div>
                         <div>
                             <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Display Name *</label>
-                            <input type="text" value={hForm.name} onChange={e => setHForm({...hForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-cyan-500" placeholder="Central Park" />
+                            <input type="text" value={hForm.name || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHForm({...hForm, name: (e.target as HTMLInputElement).value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-cyan-500" placeholder="Central Park" />
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Category</label>
-                            <select value={hForm.category} onChange={e => setHForm({...hForm, category: e.target.value as HotspotCategory})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none">
+                            <select value={hForm.category || ''} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setHForm({...hForm, category: (e.target as HTMLSelectElement).value as HotspotCategory})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none">
                                 <option value="URBAN">URBAN</option>
                                 <option value="LANDMARK">LANDMARK</option>
                                 <option value="MALL">MALL</option>
@@ -386,14 +411,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         </div>
                         <div>
                             <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Base Value (ELZR)</label>
-                            <input type="number" value={hForm.baseValue} onChange={e => setHForm({...hForm, baseValue: parseInt(e.target.value)})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
+                            <input type="number" value={hForm.baseValue || 0} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHForm({...hForm, baseValue: parseInt((e.target as HTMLInputElement).value)})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-1">
                              <label className="text-[10px] text-slate-500 font-bold uppercase mb-2 block">Upload Coin Logo</label>
                              <div className="flex items-center gap-3">
-                                 <button onClick={() => fileInputRef.current?.click()} className="w-12 h-12 rounded-xl bg-slate-800 border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-400 hover:text-white hover:border-cyan-500 transition-all overflow-hidden">
+                                 <button type="button" onClick={() => { if (fileInputRef.current) (fileInputRef.current as HTMLInputElement).click(); }} className="w-12 h-12 rounded-xl bg-slate-800 border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-400 hover:text-white hover:border-cyan-500 transition-all overflow-hidden">
                                     {hForm.logoUrl ? <img src={hForm.logoUrl} className="w-full h-full object-cover" /> : <Upload size={20} />}
                                  </button>
                                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
@@ -405,7 +430,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         </div>
                         <div>
                             <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Coin Text (Max 5)</label>
-                            <input type="text" maxLength={5} value={hForm.customText} onChange={e => setHForm({...hForm, customText: e.target.value.toUpperCase()})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none font-mono" placeholder="ELZR" />
+                            <input type="text" maxLength={5} value={hForm.customText || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHForm({...hForm, customText: (e.target as HTMLInputElement).value.toUpperCase()})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm outline-none font-mono" placeholder="ELZR" />
                         </div>
                     </div>
                     <div>
@@ -418,8 +443,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         </div>
                     </div>
                     <div className="flex gap-3 pt-2">
-                        {isEditingHotspot && <button onClick={() => { setIsEditingHotspot(null); setHForm({ id: '', name: '', coords: { lat: 52.5200, lng: 13.4050 }, radius: 200, density: 1000, category: 'URBAN', baseValue: 100, logoUrl: '', customText: '' }); }} className="flex-1 bg-slate-800 text-white font-bold py-3 rounded-xl border border-slate-700">CANCEL</button>}
-                        <button onClick={handleSaveHotspot} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl shadow-lg">
+                        {isEditingHotspot && <button type="button" onClick={() => { setIsEditingHotspot(null); setHForm({ id: '', name: '', coords: { lat: 52.5200, lng: 13.4050 }, radius: 200, density: 1000, category: 'URBAN', baseValue: 100, logoUrl: '', customText: '' }); }} className="flex-1 bg-slate-800 text-white font-bold py-3 rounded-xl border border-slate-700">CANCEL</button>}
+                        <button type="button" onClick={handleSaveHotspot} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl shadow-lg">
                             {isEditingHotspot ? 'UPDATE' : 'CREATE'}
                         </button>
                     </div>
@@ -441,8 +466,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => handleEditHotspot(h)} className="p-2 bg-slate-800 text-slate-300 rounded-lg"><Edit2 size={16}/></button>
-                            <button onClick={() => handleDeleteHotspot(h.id)} className="p-2 bg-red-900/30 text-red-400 rounded-lg"><Trash2 size={16}/></button>
+                            <button type="button" onClick={() => handleEditHotspot(h)} className="p-2 bg-slate-800 text-slate-300 rounded-lg"><Edit2 size={16}/></button>
+                            <button type="button" onClick={() => handleDeleteHotspot(h.id)} className="p-2 bg-red-900/30 text-red-400 rounded-lg"><Trash2 size={16}/></button>
                         </div>
                     </div>
                 ))}
@@ -459,14 +484,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </h2>
                 <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                        <input disabled={!!isEditingGB} type="text" value={gbForm.id} onChange={e => setGbForm({...gbForm, id: e.target.value})} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" placeholder="Box ID" />
-                        <input type="text" value={gbForm.name} onChange={e => setGbForm({...gbForm, name: e.target.value})} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" placeholder="Box Name" />
+                        <input disabled={!!isEditingGB} type="text" value={gbForm.id || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGbForm({...gbForm, id: (e.target as HTMLInputElement).value})} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" placeholder="Box ID" />
+                        <input type="text" value={gbForm.name || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGbForm({...gbForm, name: (e.target as HTMLInputElement).value})} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" placeholder="Box Name" />
                     </div>
                     <div>
                         <label className="text-[10px] text-slate-500 font-bold uppercase mb-2 block tracking-widest">Prize Pool (TON)</label>
                         <div className="flex flex-wrap gap-2">
                             {prizeOptions.map(opt => (
-                                <button key={opt} onClick={() => togglePrize(opt)} className={`px-3 py-2 rounded-lg text-xs font-black border transition-all ${gbForm.prizes?.includes(opt) ? "bg-amber-500 border-amber-400 text-black" : "bg-slate-800 border-slate-700 text-slate-400"}`}>
+                                <button type="button" key={opt} onClick={() => togglePrize(opt)} className={`px-3 py-2 rounded-lg text-xs font-black border transition-all ${gbForm.prizes?.includes(opt) ? "bg-amber-500 border-amber-400 text-black" : "bg-slate-800 border-slate-700 text-slate-400"}`}>
                                     {opt} TON
                                 </button>
                             ))}
@@ -482,8 +507,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         </div>
                     </div>
                     <div className="flex gap-3 pt-2">
-                        {isEditingGB && <button onClick={() => { setIsEditingGB(null); setGbForm({ id: '', name: '', coords: { lat: 44.4268, lng: 26.1025 }, radius: 200, category: 'GIFTBOX', prizes: [0.05, 0.5] }); }} className="flex-1 bg-slate-800 text-white font-bold py-3 rounded-xl border border-slate-700">CANCEL</button>}
-                        <button onClick={handleSaveGiftBox} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-black py-3 rounded-xl shadow-lg shadow-amber-900/20 uppercase text-xs tracking-widest">
+                        {isEditingGB && <button type="button" onClick={() => { setIsEditingGB(null); setGbForm({ id: '', name: '', coords: { lat: 44.4268, lng: 26.1025 }, radius: 200, category: 'GIFTBOX', prizes: [0.05, 0.5] }); }} className="flex-1 bg-slate-800 text-white font-bold py-3 rounded-xl border border-slate-700">CANCEL</button>}
+                        <button type="button" onClick={handleSaveGiftBox} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-black py-3 rounded-xl shadow-lg shadow-amber-900/20 uppercase text-xs tracking-widest">
                             {isEditingGB ? 'Update Box' : 'Launch Gift Box'}
                         </button>
                     </div>
@@ -505,8 +530,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => handleEditGiftBox(h)} className="p-2 bg-slate-800 text-slate-300 rounded-lg"><Edit2 size={16}/></button>
-                            <button onClick={() => handleDeleteHotspot(h.id)} className="p-2 bg-red-900/30 text-red-400 rounded-lg"><Trash2 size={16}/></button>
+                            <button type="button" onClick={() => handleEditGiftBox(h)} className="p-2 bg-slate-800 text-slate-300 rounded-lg"><Edit2 size={16}/></button>
+                            <button type="button" onClick={() => handleDeleteHotspot(h.id)} className="p-2 bg-red-900/30 text-red-400 rounded-lg"><Trash2 size={16}/></button>
                         </div>
                     </div>
                 ))}
@@ -537,7 +562,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         const allocation = totalWeightedScore / 1000000000000;
 
                         return (
-                            <div key={u.id} className="bg-slate-900 border-2 border-slate-800 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden group">
+                            <div key={u.telegramId} className="bg-slate-900 border-2 border-slate-800 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden group">
                                 <div className="absolute -right-12 -top-12 bg-cyan-500/5 w-40 h-40 rounded-full blur-3xl"></div>
                                 <div className="flex justify-between items-start mb-6 relative z-10">
                                     <div className="flex items-center gap-4">
@@ -558,12 +583,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                         <span className="text-[8px] text-slate-600 font-black uppercase">ELZR</span>
                                     </div>
                                 </div>
-                                <button 
+                                <button
+                                    type="button"
                                     onClick={() => handleExecuteAirdrop(u, allocation)}
-                                    disabled={isProcessingAirdrop === u.id}
+                                    disabled={isProcessingAirdrop === u.telegramId?.toString()}
                                     className="w-full py-4 bg-white text-black font-black rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl disabled:opacity-50 uppercase tracking-widest text-[10px]"
                                 >
-                                    {isProcessingAirdrop === u.id ? <Loader2 className="animate-spin" size={16}/> : <Send size={16} />}
+                                    {isProcessingAirdrop === u.telegramId?.toString() ? <Loader2 className="animate-spin" size={16}/> : <Send size={16} />}
                                     Initiate ELZR Payout
                                 </button>
                             </div>
@@ -592,7 +618,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
             ) : (
                 <div className="space-y-4">
                     {withdrawals.map(req => {
-                        const user = users.find(u => u.id === String(req.userId));
+                        const user = users.find(u => u.telegramId === parseInt(req.userId));
                         const isPending = req.status === 'pending';
                         
                         return (
@@ -625,7 +651,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                 </div>
 
                                 {isPending ? (
-                                    <button 
+                                    <button
+                                        type="button"
                                         onClick={() => handleProcessPayment(req)}
                                         disabled={isExecutingPayment === req.id || !user?.walletAddress}
                                         className="w-full py-4 bg-white text-blue-900 font-black rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl disabled:opacity-50 uppercase tracking-widest text-[10px]"
@@ -655,14 +682,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <h1 className="text-xl font-black text-white uppercase tracking-tighter">Admin Console</h1>
                 </div>
                 <div className="flex gap-4 overflow-x-auto no-scrollbar">
-                    <button onClick={() => setActiveTab('dashboard')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'dashboard' ? 'border-cyan-400 text-white' : 'border-transparent text-slate-500'}`}>Dashboard</button>
-                    <button onClick={() => setActiveTab('users')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'users' ? 'border-cyan-400 text-white' : 'border-transparent text-slate-500'}`}>Users</button>
-                    <button onClick={() => setActiveTab('ads')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'ads' ? 'border-cyan-400 text-white' : 'border-transparent text-slate-500'}`}>Ads</button>
-                    <button onClick={() => setActiveTab('hotspots')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'hotspots' ? 'border-cyan-400 text-white' : 'border-transparent text-slate-500'}`}>Hotspots</button>
-                    <button onClick={() => setActiveTab('giftboxes')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'giftboxes' ? 'border-amber-400 text-amber-400' : 'border-transparent text-slate-500'}`}>Gift Boxes</button>
-                    <button onClick={() => setActiveTab('airdrop')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'airdrop' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-500'}`}>Airdrop</button>
-                    <button onClick={() => setActiveTab('payments')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'payments' ? 'border-blue-400 text-blue-400' : 'border-transparent text-slate-500'}`}>Payments</button>
-                    <button onClick={() => setActiveTab('system')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'system' ? 'border-red-400 text-red-400' : 'border-transparent text-slate-500'}`}>System</button>
+                    <button type="button" onClick={() => setActiveTab('dashboard')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'dashboard' ? 'border-cyan-400 text-white' : 'border-transparent text-slate-500'}`}>Dashboard</button>
+                    <button type="button" onClick={() => setActiveTab('users')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'users' ? 'border-cyan-400 text-white' : 'border-transparent text-slate-500'}`}>Users</button>
+                    <button type="button" onClick={() => setActiveTab('ads')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'ads' ? 'border-cyan-400 text-white' : 'border-transparent text-slate-500'}`}>Ads</button>
+                    <button type="button" onClick={() => setActiveTab('hotspots')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'hotspots' ? 'border-cyan-400 text-white' : 'border-transparent text-slate-500'}`}>Hotspots</button>
+                    <button type="button" onClick={() => setActiveTab('giftboxes')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'giftboxes' ? 'border-amber-400 text-amber-400' : 'border-transparent text-slate-500'}`}>Gift Boxes</button>
+                    <button type="button" onClick={() => setActiveTab('airdrop')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'airdrop' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-500'}`}>Airdrop</button>
+                    <button type="button" onClick={() => setActiveTab('payments')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'payments' ? 'border-blue-400 text-blue-400' : 'border-transparent text-slate-500'}`}>Payments</button>
+                    <button type="button" onClick={() => setActiveTab('system')} className={`pb-3 text-sm font-bold border-b-2 whitespace-nowrap ${activeTab === 'system' ? 'border-red-400 text-red-400' : 'border-transparent text-slate-500'}`}>System</button>
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 pb-32 no-scrollbar">
@@ -682,7 +709,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                 type="text"
                                 placeholder="Search by Username or Telegram ID..."
                                 value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery((e.target as HTMLInputElement).value)}
                                 className="w-full bg-slate-900 border-2 border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm text-white outline-none focus:border-cyan-500 transition-all"
                             />
                         </div>
@@ -698,7 +725,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                     const isBiometricActive = user.biometricEnabled !== false;
                                    
                                     return (
-                                        <div key={user.id} className={`bg-slate-900 border-2 rounded-[2.5rem] p-6 flex flex-col transition-all shadow-2xl relative overflow-hidden ${user.isBanned ? 'border-red-600/40 bg-red-950/10' : 'border-slate-800'}`}>
+                                        <div key={user.telegramId} className={`bg-slate-900 border-2 rounded-[2.5rem] p-6 flex flex-col transition-all shadow-2xl relative overflow-hidden ${user.isBanned ? 'border-red-600/40 bg-red-950/10' : 'border-slate-800'}`}>
                                            
                                             <div className="flex justify-between items-start mb-6 relative z-10">
                                                 <div className="flex items-center gap-4">
@@ -722,7 +749,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <p className="text-[10px] text-slate-500 font-mono font-bold">ID: {user.id}</p>
+                                                            <p className="text-[10px] text-slate-500 font-mono font-bold">ID: {user.telegramId}</p>
                                                             <div className="w-1.5 h-1.5 bg-slate-700 rounded-full"></div>
                                                             <p className={`text-[9px] font-black uppercase tracking-widest ${user.isBanned ? 'text-red-500' : 'text-green-500'}`}>
                                                                 {user.isBanned ? 'PROTOCOL: LOCKED' : 'PROTOCOL: ACTIVE'}
@@ -732,7 +759,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                                 </div>
                                                 <div className="flex gap-2">
                                                     <button
-                                                        onClick={() => handleToggleBan(user.id, !!user.isBanned)}
+                                                        type="button"
+                                                        onClick={() => handleToggleBan(user.telegramId?.toString() || '', !!user.isBanned)}
                                                         className={`p-3 rounded-2xl transition-all border-2 active:scale-90 ${user.isBanned ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}
                                                         title={user.isBanned ? "Unlock User" : "Ban User"}
                                                     >
@@ -740,7 +768,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                                     </button>
                                                    
                                                     <button
-                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        type="button"
+                                                        onClick={() => handleDeleteUser(user.telegramId?.toString() || '')}
                                                         className="p-3 bg-red-600/10 text-red-500 rounded-2xl border-2 border-red-600/30 active:scale-90 hover:bg-red-600/20 shadow-lg"
                                                         title="Delete Account Permanently"
                                                     >
@@ -779,7 +808,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                                         <span className="text-[9px] font-black uppercase tracking-widest">Ban History</span>
                                                     </div>
                                                     <span className={`text-[10px] font-black block text-center ${user.isBanned ? 'text-red-400' : 'text-slate-400'}`}>
-                                                        {user.banCount || (user.isBanned ? 1 : 0)} TIMES
+                                                        {(user.isBanned ? 1 : 0)} TIMES
                                                     </span>
                                                 </div>
                                             </div>
@@ -792,8 +821,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                                         </span>
                                                     </div>
                                                     <button
+                                                        type="button"
                                                         disabled={!isInactive}
-                                                        onClick={() => handleResetUserAccount(user.id)}
+                                                        onClick={() => handleResetUserAccount(user.telegramId?.toString() || '')}
                                                         className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl border-2 transition-all active:scale-95 ${isInactive ? 'bg-cyan-600/10 border-cyan-500/40 text-cyan-400 hover:bg-cyan-600/20' : 'opacity-20 grayscale cursor-not-allowed border-slate-800 text-slate-500'}`}
                                                     >
                                                         <RotateCcw size={18} className={isInactive ? "animate-spin-slow" : ""} />
@@ -801,7 +831,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                                     </button>
                                                 </div>
                                                 <button
-                                                    onClick={() => handleToggleBiometric(user.id, isBiometricActive)}
+                                                    type="button"
+                                                    onClick={() => handleToggleBiometric(user.telegramId?.toString() || '', isBiometricActive)}
                                                     className={`w-full py-4 rounded-2xl border-2 flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg ${isBiometricActive ? 'bg-slate-800/80 border-slate-700 text-cyan-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-500'}`}
                                                 >
                                                     <Fingerprint size={22} className={isBiometricActive ? "text-cyan-500" : "text-amber-500 animate-pulse"} />
@@ -832,8 +863,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <div className="bg-red-950/20 border border-red-900/50 p-6 rounded-2xl">
                         <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><AlertTriangle className="text-red-500" /> DANGER ZONE</h2>
                         <div className="space-y-4">
-                            <button onClick={onToggleTestMode} className={`w-full py-3 rounded-xl font-bold text-xs ${isTestMode ? 'bg-green-500 text-black' : 'bg-slate-800 text-slate-500'}`}>TEST MODE: {isTestMode ? 'ON' : 'OFF'}</button>
-                            <button onClick={onResetMyAccount} className="w-full py-3 bg-red-600 rounded-xl font-bold text-xs">RESET MY ACCOUNT</button>
+                            <button type="button" onClick={onToggleTestMode} className={`w-full py-3 rounded-xl font-bold text-xs ${isTestMode ? 'bg-green-500 text-black' : 'bg-slate-800 text-slate-500'}`}>TEST MODE: {isTestMode ? 'ON' : 'OFF'}</button>
+                            <button type="button" onClick={onResetMyAccount} className="w-full py-3 bg-red-600 rounded-xl font-bold text-xs">RESET MY ACCOUNT</button>
                         </div>
                     </div>
                 )}
