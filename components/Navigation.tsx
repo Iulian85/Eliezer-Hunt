@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Tab } from '../types';
 import { Home, Droplet, Store, Heart, ShoppingCart, Wallet, ShieldCheck } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -18,6 +18,10 @@ export const Navigation: React.FC<NavigationProps> = ({
   hasSale = true,
   cartCount = 1 
 }) => {
+  const [activePosition, setActivePosition] = useState({ x: 0, width: 0 });
+  const navRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Record<string, HTMLButtonElement>>({});
+
   const navItems = [
     { id: Tab.MAP, icon: Home, label: 'Home' },
     { id: Tab.HUNT, icon: Droplet, label: 'Drop' },
@@ -29,6 +33,29 @@ export const Navigation: React.FC<NavigationProps> = ({
   ];
 
   const visibleItems = navItems.filter(item => item.id !== Tab.ADMIN || isAdmin);
+
+  // Efect pentru calcularea poziției și dimensiunii indicatorului
+  useEffect(() => {
+    const updateIndicatorPosition = () => {
+      const activeItem = itemRefs.current[currentTab];
+      if (activeItem && navRef.current) {
+        const navRect = navRef.current.getBoundingClientRect();
+        const itemRect = activeItem.getBoundingClientRect();
+        
+        // Calculăm poziția relativă în interiorul containerului
+        const x = itemRect.left - navRect.left;
+        const width = itemRect.width;
+        
+        setActivePosition({ x, width });
+      }
+    };
+
+    updateIndicatorPosition();
+    
+    // Recalculăm la redimensionarea ferestrei
+    window.addEventListener('resize', updateIndicatorPosition);
+    return () => window.removeEventListener('resize', updateIndicatorPosition);
+  }, [currentTab, visibleItems]);
 
   const handleTabClick = (id: Tab) => {
     if (id !== currentTab) {
@@ -42,70 +69,113 @@ export const Navigation: React.FC<NavigationProps> = ({
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 pointer-events-none px-4">
       <div className="pointer-events-auto mx-auto max-w-md">
-        {/* Fundal gradient violet-albastru blurat */}
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full blur-3xl opacity-70" />
+        {/* Fundal blurat */}
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full blur-3xl opacity-60" />
         
-        {/* Capsulă albă principală */}
-        <nav className="relative bg-white rounded-full shadow-2xl py-4 px-8 flex items-center justify-between">
-          {visibleItems.map((item, index) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
-            const isFirst = index === 0;
-            const isLast = index === visibleItems.length - 1;
+        {/* Container principal cu efect lichid */}
+        <div className="relative bg-gradient-to-r from-purple-50 to-blue-50 rounded-full shadow-2xl py-2 px-6">
+          {/* Indicator lichid - se mișcă între tab-uri */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-[85%] bg-gradient-to-r from-purple-600 via-blue-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
+            style={{
+              left: `${activePosition.x}px`,
+              width: `${activePosition.width}px`,
+              filter: 'drop-shadow(0 4px 6px rgba(99, 102, 241, 0.3))',
+            }}
+          />
+          
+          {/* Efect de reflectare pe indicator */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-[60%] w-[70%] bg-gradient-to-t from-white/30 to-transparent rounded-full transition-all duration-500 ease-out pointer-events-none"
+            style={{
+              left: `${activePosition.x + activePosition.width * 0.15}px`,
+              width: `${activePosition.width * 0.7}px`,
+            }}
+          />
+          
+          {/* Container pentru item-uri */}
+          <nav 
+            ref={navRef}
+            className="relative flex items-center justify-between gap-2 py-1"
+          >
+            {visibleItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentTab === item.id;
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabClick(item.id)}
-                className="relative z-10 flex flex-col items-center gap-1.5 min-w-16"
-              >
-                {/* Liquid indicator asimetric – doar sub tab activ */}
-                {isActive && (
-                  <div className={clsx(
-                    "absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-blue-600 to-indigo-500 rounded-t-full overflow-hidden",
-                    "shadow-lg shadow-blue-500/50"
-                  )}>
-                    {/* Wave efect subtil */}
-                    <div className="absolute inset-x-0 bottom-0 h-8 bg-white/20 rounded-t-full" />
-                  </div>
-                )}
-
-                <div className="relative flex flex-col items-center gap-1">
-                  <div className="relative">
-                    <Icon 
-                      size={24} 
-                      strokeWidth={isActive ? 2.8 : 2}
-                      className={clsx(
-                        isActive ? "text-white drop-shadow-lg" : "text-gray-700"
+              return (
+                <button
+                  key={item.id}
+                  ref={(el) => {
+                    if (el) {
+                      itemRefs.current[item.id] = el;
+                    }
+                  }}
+                  onClick={() => handleTabClick(item.id)}
+                  className="relative flex-1 min-w-0 flex flex-col items-center gap-1.5 py-2 px-1 rounded-full transition-all duration-300 z-10"
+                >
+                  <div className="relative z-20 flex flex-col items-center gap-1">
+                    <div className="relative">
+                      <Icon 
+                        size={22} 
+                        strokeWidth={isActive ? 2.5 : 2}
+                        className={clsx(
+                          "transition-all duration-300",
+                          isActive 
+                            ? "text-white drop-shadow-md" 
+                            : "text-gray-600 hover:text-gray-900"
+                        )}
+                      />
+                      
+                      {/* Badge sale */}
+                      {item.hasSale && (
+                        <span className={clsx(
+                          "absolute -top-1.5 -right-2.5 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full uppercase shadow-md transition-all duration-300",
+                          isActive 
+                            ? "bg-red-400" 
+                            : "bg-red-500"
+                        )}>
+                          sale
+                        </span>
                       )}
-                    />
+                      
+                      {/* Badge cart */}
+                      {item.badge && item.badge > 0 && (
+                        <span className={clsx(
+                          "absolute -top-1.5 -right-2.5 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-md transition-all duration-300",
+                          isActive 
+                            ? "bg-orange-400" 
+                            : "bg-orange-500"
+                        )}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
                     
-                    {/* Badge sale */}
-                    {item.hasSale && (
-                      <span className="absolute -top-1 -right-3 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase shadow-md">
-                        sale
-                      </span>
-                    )}
-                    
-                    {/* Badge cart */}
-                    {item.badge && item.badge > 0 && (
-                      <span className="absolute -top-1 -right-2 bg-orange-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-md">
-                        {item.badge}
-                      </span>
-                    )}
+                    <span className={clsx(
+                      "text-xs font-medium transition-all duration-300",
+                      isActive 
+                        ? "text-white drop-shadow-md" 
+                        : "text-gray-600 hover:text-gray-900"
+                    )}>
+                      {item.label}
+                    </span>
                   </div>
                   
-                  <span className={clsx(
-                    "text-xs font-medium",
-                    isActive ? "text-white drop-shadow" : "text-gray-700"
-                  )}>
-                    {item.label}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </nav>
+                  {/* Efect de hover - mic glow */}
+                  <div className={clsx(
+                    "absolute inset-0 rounded-full opacity-0 transition-opacity duration-300",
+                    isActive 
+                      ? "opacity-100 bg-gradient-to-r from-purple-500/10 to-blue-500/10" 
+                      : "hover:opacity-100 hover:bg-gray-200/30"
+                  )} />
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+        
+        {/* Umbra subtilă dedesubt */}
+        <div className="absolute -bottom-2 inset-x-6 h-4 bg-gradient-to-t from-purple-200/50 to-transparent blur-md rounded-full" />
       </div>
     </div>
   );
