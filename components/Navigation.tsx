@@ -42,33 +42,41 @@ export const Navigation: React.FC<NavigationProps> = ({
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 pointer-events-none px-4">
       <div className="pointer-events-auto mx-auto max-w-md">
-        {/* Fundal gradient violet-albastru */}
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full blur-3xl opacity-60" />
+        {/* Fundal gradient violet-albastru blurat */}
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full blur-3xl opacity-70" />
         
-        {/* Capsulă albă lungă */}
-        <nav className="relative bg-white rounded-full shadow-2xl py-4 px-8 flex items-center justify-between gap-4">
-          {visibleItems.map((item) => {
+        {/* Capsulă albă principală */}
+        <nav className="relative bg-white rounded-full shadow-2xl py-4 px-8 flex items-center justify-between">
+          {visibleItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
+            const isFirst = index === 0;
+            const isLast = index === visibleItems.length - 1;
 
             return (
               <button
                 key={item.id}
                 onClick={() => handleTabClick(item.id)}
-                className="relative flex flex-col items-center gap-1.5 min-w-16"
+                className="relative z-10 flex flex-col items-center gap-1.5 min-w-16"
               >
-                {/* Bubble active asimetric (doar pe tab activ, rotunjit pe o parte) */}
+                {/* Liquid indicator asimetric – doar sub tab activ */}
                 {isActive && (
-                  <div className="absolute inset-x-0 -bottom-4 h-16 bg-gradient-to-t from-blue-600 to-indigo-600 rounded-t-full" />
+                  <div className={clsx(
+                    "absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-blue-600 to-indigo-500 rounded-t-full overflow-hidden",
+                    "shadow-lg shadow-blue-500/50"
+                  )}>
+                    {/* Wave efect subtil */}
+                    <div className="absolute inset-x-0 bottom-0 h-8 bg-white/20 rounded-t-full" />
+                  </div>
                 )}
 
-                <div className="relative z-10 flex flex-col items-center gap-1">
+                <div className="relative flex flex-col items-center gap-1">
                   <div className="relative">
                     <Icon 
                       size={24} 
-                      strokeWidth={isActive ? 2.5 : 2}
+                      strokeWidth={isActive ? 2.8 : 2}
                       className={clsx(
-                        isActive ? "text-white" : "text-gray-700"
+                        isActive ? "text-white drop-shadow-lg" : "text-gray-700"
                       )}
                     />
                     
@@ -89,7 +97,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                   
                   <span className={clsx(
                     "text-xs font-medium",
-                    isActive ? "text-white" : "text-gray-700"
+                    isActive ? "text-white drop-shadow" : "text-gray-700"
                   )}>
                     {item.label}
                   </span>
