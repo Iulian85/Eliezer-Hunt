@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Tab } from '../types';
 import { Map, Crosshair, Wallet, Trophy, Megaphone, ShieldCheck, Users } from 'lucide-react';
