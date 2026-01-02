@@ -1,3 +1,5 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Tab } from '../types';
 import React, { useState } from 'react';
 import { Home, Droplet, Store, Heart, ShoppingCart } from 'lucide-react';
 import { clsx } from 'clsx';
