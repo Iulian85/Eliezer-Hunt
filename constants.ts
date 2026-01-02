@@ -103,3 +103,4 @@ export const GLOBAL_SPAWNS: SpawnPoint[] = [];
 export const MAX_INTERACTION_DISTANCE = 80;
 export const REWARD_AD_VALUE = 500;
 export const NEARBY_SEARCH_RADIUS = 20000;
+export const ADMIN_WALLET_ADDRESS = getEnv('VITE_ADMIN_WALLET_ADDRESS');
