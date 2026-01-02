@@ -8,7 +8,7 @@ import { Coin3D } from '../components/Coin3D.tsx';
 import { LocateFixed, Navigation, Rocket, Crown, Gift, Megaphone } from 'lucide-react';
 import { ARView } from './ARView.tsx';
 
-import { AmbientLight } from '@react-three/drei';
+import { AmbientLight } from 'three';
 
 interface HuntViewProps {
     location: Coordinate;

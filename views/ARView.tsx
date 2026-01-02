@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { AmbientLight, DeviceOrientationControls, DirectionalLight, Group, PerspectiveCamera, Text, Billboard } from '@react-three/drei';
+import { DeviceOrientationControls, PerspectiveCamera, Text, Billboard } from '@react-three/drei';
+import { AmbientLight, DirectionalLight, Group } from 'three';
 import { X, Loader2, CheckCircle, Gift, PackageOpen, Coins, Wallet, Camera, Zap } from 'lucide-react';
 import * as THREE from 'three';
 import { Coin3D } from '../components/Coin3D.tsx';

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   base: './', // Corect, previne rutele absolute greșite
   define: {
-    'process.env': process.env,
+    'process.env': {},
   },
   server: {
     host: true,
