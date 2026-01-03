@@ -238,6 +238,10 @@ function App() {
                 });
             }
 
+            // Pentru testare, setăm direct isUnlocked la true
+            // Comentăm această linie când vrei să folosești biometria în producție
+            setIsUnlocked(true);
+
             // Parse the validated data
             const parsedData = parseTelegramWebAppData(tg.initData);
             if (!parsedData || !parsedData.user) {
