@@ -148,9 +148,11 @@ export const getUserById = async (tgId: number): Promise<UserState> => {
 export const syncUserWithDatabase = async (userData: Record<string, unknown>, localState: UserState, fingerprint: string): Promise<UserState> => {
   if (!userData) return localState;
 
+  console.log("syncUserWithDatabase called with:", userData); // Adăugăm logging pentru debugging
+  console.log("Fingerprint:", fingerprint); // Adăugăm logging pentru debugging
+
   try {
-    console.log("Syncing user with database:", userData); // Adăugăm logging pentru debugging
-    console.log("Fingerprint:", fingerprint); // Adăugăm logging pentru debugging
+    console.log("About to make API request to sync-user"); // Adăugăm logging pentru debugging
 
     const response = await apiRequest("/sync-user", {
       method: "POST",
@@ -160,7 +162,7 @@ export const syncUserWithDatabase = async (userData: Record<string, unknown>, lo
       }),
     });
 
-    console.log("Sync response:", response); // Adăugăm logging pentru debugging
+    console.log("Successfully received response from sync-user:", response); // Adăugăm logging pentru debugging
     return sanitizeUserData(response.user, localState);
   } catch (error) {
     console.error("Error syncing user with database:", error);

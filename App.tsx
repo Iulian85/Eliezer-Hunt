@@ -276,7 +276,9 @@ function App() {
                     console.warn("Fingerprint detection timeout");
                 }
 
+                console.log("About to call syncUserWithDatabase with:", userData); // Adăugăm logging
                 const synced = await syncUserWithDatabase(userData, defaultUserState, fingerprint);
+                console.log("syncUserWithDatabase completed with result:", synced); // Adăugăm logging
                 setUserState(prev => ({ ...prev, ...synced }));
 
                 if (!synced.deviceFingerprint || synced.joinedAt === synced.lastActive) {
