@@ -13,7 +13,7 @@ export interface WithdrawalRequest {
 // Supabase Edge Functions service
 // Base API URL for Supabase Edge Functions
 const SUPABASE_PROJECT_URL = import.meta.env.VITE_SUPABASE_PROJECT_URL; // e.g., "https://xxxxx.supabase.co"
-const SUPABASE_FUNCTION_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY; // Supabase anon key
+const SUPABASE_FUNCTION_KEY = import.meta.env.VITE_SUPABASE_KEY; // Supabase new API key
 
 // For Railway deployment, we might use a custom API URL
 const CUSTOM_API_URL = import.meta.env.VITE_CUSTOM_API_URL; // Custom API URL for Railway functions
@@ -27,14 +27,11 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<
   console.log(`Making API request to: ${API_BASE}${endpoint}`); // Adăugăm logging
   console.log(`Request options:`, options); // Adăugăm logging
 
-  // For Railway deployment, we might not need the Authorization header
-  // or we might need to use a different authentication method
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      // Temporarily removing authorization header for testing
-      // "Authorization": `Bearer ${SUPABASE_FUNCTION_KEY}`,
+      "Authorization": `Bearer ${SUPABASE_FUNCTION_KEY}`,
       ...options.headers,
     },
   });
