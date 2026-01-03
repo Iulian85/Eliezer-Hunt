@@ -32,6 +32,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${SUPABASE_FUNCTION_KEY}`,
+      "apikey": SUPABASE_FUNCTION_KEY, // Adăugăm și headerul apikey pentru Supabase
       ...options.headers,
     },
   });
