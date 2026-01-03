@@ -7,7 +7,7 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react';
 // Folosim manifestul local definit în public/tonconnect-manifest.json
 const manifestUrl = `${globalThis.location?.origin || (typeof globalThis.window !== 'undefined' && globalThis.window.location.origin) || ''}/tonconnect-manifest.json`;
 
-const rootElement = typeof document !== 'undefined' ? document.getElementById('root') : null;
+const rootElement = (globalThis as any).document?.getElementById('root') ?? null;
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }

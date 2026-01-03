@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTonAddress } from '@tonconnect/ui-react';
-import { Navigation } from './components/Navigation';
-import { Tab, UserState, SpawnPoint, Coordinate, Campaign, AdStatus, HotspotDefinition, HotspotCategory, SponsorData } from './types';
-import { GLOBAL_SPAWNS, GLOBAL_HOTSPOTS } from './constants';
-import { generateRandomSpawns } from './utils';
-import { Sparkles, ShieldAlert, ExternalLink, UserX, AlertTriangle, Fingerprint, Lock, ShieldCheck, Loader2, SmartphoneNfc, RefreshCw, Settings, ShieldQuestion, Send } from 'lucide-react';
+import { Navigation } from "./components/Navigation.tsx";
+import { Tab, UserState, SpawnPoint, Coordinate, Campaign, AdStatus, HotspotDefinition, HotspotCategory, SponsorData } from './types.ts';
+import { GLOBAL_SPAWNS, GLOBAL_HOTSPOTS } from './constants.ts';
+import { generateRandomSpawns } from './utils.ts';
+import { Sparkles, AlertTriangle, Fingerprint, Lock, Loader2, SmartphoneNfc, ShieldQuestion, Send } from 'lucide-react';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 import {
@@ -22,21 +21,21 @@ import {
     deleteHotspotDatabase,
     updateUserWalletInDatabase,
     resetUserInDatabase
-} from './services/database';
+} from './services/database.ts';
 
 import {
     validateTelegramWebAppData,
     parseTelegramWebAppData
-} from './services/telegram';
+} from './services/telegram.ts';
 
-import { MapView } from './views/MapView';
-import { HuntView } from './views/HuntView';
-import { WalletView } from './views/WalletView';
-import { FrensView } from './views/FrensView';
-import { AdsView } from './views/AdsView';
-import { AdminView } from './views/AdminView';
-import { LeaderboardView } from './views/LeaderboardView';
-import { AIChat } from './components/AIChat';
+import { MapView } from './views/MapView.tsx';
+import { HuntView } from './views/HuntView.tsx';
+import { WalletView } from './views/WalletView.tsx';
+import { FrensView } from './views/FrensView.tsx';
+import { AdsView } from './views/AdsView.tsx';
+import { AdminView } from './views/AdminView.tsx';
+import { LeaderboardView } from './views/LeaderboardView.tsx';
+import { AIChat } from './components/AIChat.tsx';
 
 const DEFAULT_LOCATION: Coordinate = { lat: 20.0, lng: 0.0 }; 
 
@@ -90,10 +89,10 @@ function App() {
         const fetchAdminWallet = async () => {
             try {
                 // Apel către funcția Database pentru a obține adresa de admin
-                const { getAdminWallet } = await import('./services/database');
+                const { getAdminWallet } = await import("./services/database.ts");
                 const result = await getAdminWallet();
-                if (result && result.adminWalletAddress) {
-                    setAdminWalletAddress(result.adminWalletAddress);
+                if (result && result.address) {
+                    setAdminWalletAddress(result.address)
                 }
             } catch (error) {
                 console.error('Error fetching admin wallet address:', error);
@@ -113,10 +112,10 @@ function App() {
         const isJailbroken = () => {
             // Verificări simple pentru jailbreak/root
             const checks = [
-                () => !!(window as typeof window & { Safari?: any }).Safari,
+                () => !!(globalThis as typeof globalThis & { Safari?: any }).Safari,
                 () => !!(navigator as typeof navigator & { plugins?: any }).plugins?.length,
-                () => !!(window as typeof window & { StatusBar?: any }).StatusBar,
-                () => !!(window as typeof window & { device?: any }).device,
+                () => !!(globalThis as typeof globalThis & { StatusBar?: any }).StatusBar,
+                () => !!(globalThis as typeof globalThis & { device?: any }).device,
             ];
             return checks.some(check => check());
         };
@@ -126,7 +125,7 @@ function App() {
             let debug = false;
             try {
                 // Verificare pentru devtools
-                Object.defineProperty(window, 'devtools', {
+                Object.defineProperty(globalThis, 'devtools', {
                     get: function() {
                         debug = true;
                         return true;
@@ -183,7 +182,7 @@ function App() {
         const unsubHotspots = subscribeToHotspots(setCustomHotspots);
 
         const initUser = async () => {
-            const tg = window.Telegram?.WebApp;
+            const tg = globalThis.Telegram?.WebApp;
 
             if (!tg || !tg.initData || !tg.initDataUnsafe) {
                 setIsTelegram(false);
@@ -192,7 +191,7 @@ function App() {
             }
 
             // Validare criptografică a datelor din Telegram
-            const botToken = process.env.VITE_BOT_TOKEN; // Ar trebui să fie setat ca variabilă de mediu
+            const botToken = import.meta.env.VITE_BOT_TOKEN; // Ar trebui să fie setat ca variabilă de mediu
             if (botToken && !(await validateTelegramWebAppData(tg.initData, botToken))) {
                 console.error("Invalid Telegram WebApp data");
                 setIsTelegram(false);
@@ -233,14 +232,14 @@ function App() {
                 let fingerprint = "unknown_device";
                 try {
                     const fpPromise = FingerprintJS.load().then(fp => fp.get());
-                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
+                    const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
                     const result = await Promise.race([fpPromise, timeoutPromise]) as { visitorId: string } | Error;
                     if (result instanceof Error) {
                         throw result;
                     }
                     fingerprint = result.visitorId;
                     setCurrentFingerprint(fingerprint);
-                } catch (e) {
+                } catch (e: unknown) {
                     console.warn("Fingerprint detection timeout");
                 }
 
@@ -265,12 +264,12 @@ function App() {
                     }
                 }
 
-                subscribeToUserProfile(parseInt(userId), defaultUserState, (updatedData) => {
+                subscribeToUserProfile(parseInt(userId), defaultUserState, (updatedData: UserState) => {
                     setUserState(prev => ({ ...prev, ...updatedData }));
                     if (updatedData.isBanned) setIsBlocked(true);
                 });
 
-            } catch (err) {
+            } catch (err: unknown) {
                 console.error("Initialization Error:", err);
             } finally {
                 setIsLoading(false);
@@ -287,7 +286,7 @@ function App() {
             return;
         }
 
-        const tg = window.Telegram?.WebApp;
+        const tg = globalThis.Telegram?.WebApp;
         const bm = tg?.BiometricManager;
 
         if (!bm) {
@@ -332,9 +331,9 @@ function App() {
     }, [userWalletAddress, userState.telegramId]);
 
     useEffect(() => {
-        if (!navigator.geolocation || !isUnlocked) return;
-        const watchId = navigator.geolocation.watchPosition(
-            (pos) => {
+        if (!("geolocation" in navigator) || !isUnlocked) return;
+        const watchId = ("geolocation" in navigator) ? navigator.geolocation.watchPosition(
+            (pos: GeolocationPosition) => {
                 const newCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setUserState(prev => ({ ...prev, location: newCoords }));
                 if (!initialSpawnDone.current) {
@@ -342,10 +341,14 @@ function App() {
                     initialSpawnDone.current = true;
                 }
             },
-            (err) => {},
+            (err: GeolocationPositionError) => {},
             { enableHighAccuracy: true }
-        );
-        return () => navigator.geolocation.clearWatch(watchId);
+        ) : null;
+        return () => {
+            if (watchId && "geolocation" in navigator) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+        };
     }, [isUnlocked]);
 
     const handleCollect = useCallback(async (spawnId: string, value: number, category?: HotspotCategory, tonReward: number = 0) => {
@@ -358,11 +361,11 @@ function App() {
         }
 
         setSpawns(prev => prev.filter(s => s.id !== spawnId));
-        if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        if (globalThis.Telegram?.WebApp?.HapticFeedback) globalThis.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
     }, [userState.telegramId, userState.collectedIds, isBlocked, isAdmin]);
 
     const handleInvite = useCallback(async () => {
-        const tg = window.Telegram?.WebApp;
+        const tg = globalThis.Telegram?.WebApp;
         if (!tg) return;
         const userId = tg.initDataUnsafe?.user?.id?.toString();
         if (!userId) return;
@@ -370,15 +373,15 @@ function App() {
         const inviteLink = `https://t.me/Obadiah_Bot/eliezer?startapp=ref_${userId}`;
         const shareText = "Hunt crypto in the real world with Eliezer Hunt! 🚀 Join my extraction squad!";
         const fullUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
-        
+
         tg.openTelegramLink(fullUrl);
     }, []);
 
     const handleResetAccount = async () => {
-        if (window.confirm("RESET ACCOUNT: Are you sure you want to permanently delete all progress?")) {
+        if (globalThis.confirm("RESET ACCOUNT: Are you sure you want to permanently delete all progress?")) {
             if (userState.telegramId) {
                 await resetUserInDatabase(userState.telegramId);
-                window.location.reload();
+                globalThis.location.reload();
             }
         }
     };
@@ -482,7 +485,8 @@ function App() {
                         </p>
                     </div>
 
-                    <button 
+                    <button
+                        type="button"
                         onClick={handleUnlock}
                         disabled={isAuthenticating}
                         className={`w-full py-5 rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl ${isAuthenticating ? 'bg-slate-800 text-slate-500' : 'bg-white text-black hover:bg-slate-200 shadow-white/10'}`}
@@ -560,8 +564,8 @@ function App() {
                     <AdminView 
                         allCampaigns={campaigns} 
                         customHotspots={customHotspots} 
-                        onSaveHotspots={async (newHotspots) => {
-                            for (const h of newHotspots) await saveHotspotDatabase(h);
+                        onSaveHotspots={(newHotspots) => {
+                            for (const h of newHotspots) saveHotspotDatabase(h);
                         }} 
                         onDeleteHotspot={async (id) => {
                             await deleteHotspotDatabase(id);
@@ -579,7 +583,8 @@ function App() {
             </div>
 
             {(activeTab === Tab.MAP || activeTab === Tab.HUNT) && (
-                <button 
+                <button
+                    type="button"
                     onClick={() => setShowAIChat(true)}
                     className="fixed right-6 bottom-24 z-[999] w-12 h-12 bg-cyan-600 rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.6)] border border-cyan-400 animate-bounce transition-transform active:scale-90"
                 >
