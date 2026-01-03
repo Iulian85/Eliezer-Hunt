@@ -62,6 +62,17 @@ const defaultUserState: UserState = {
     photoUrl: ''
 };
 
+// Check Telegram environment synchronously
+const isTelegramEnvironment = () => {
+    const tg = globalThis.Telegram?.WebApp;
+    return !!(tg &&
+              tg.initData &&
+              tg.initDataUnsafe &&
+              tg.initDataUnsafe.user &&
+              typeof tg.ready === 'function' &&
+              typeof tg.expand === 'function');
+};
+
 function App() {
     const userWalletAddress = useTonAddress();
     const [activeTab, setActiveTab] = useState<Tab>(Tab.MAP);
@@ -69,8 +80,9 @@ function App() {
     const [spawns, setSpawns] = useState<SpawnPoint[]>(GLOBAL_SPAWNS);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [customHotspots, setCustomHotspots] = useState<HotspotDefinition[]>([]);
+
     const [isLoading, setIsLoading] = useState(true);
-    const [isTelegram, setIsTelegram] = useState(false);
+    const [isTelegram, setIsTelegram] = useState(isTelegramEnvironment());
     const [isTestMode, setIsTestMode] = useState(false);
     const [showAIChat, setShowAIChat] = useState(false);
     const [isBlocked, setIsBlocked] = useState(false);
@@ -182,9 +194,23 @@ function App() {
         const unsubHotspots = subscribeToHotspots(setCustomHotspots);
 
         const initUser = async () => {
+            // Improved Telegram detection
             const tg = globalThis.Telegram?.WebApp;
 
-            if (!tg || !tg.initData || !tg.initDataUnsafe) {
+            // More comprehensive check for Telegram environment
+            if (!tg ||
+                !tg.initData ||
+                !tg.initDataUnsafe ||
+                !globalThis.Telegram ||
+                typeof tg.ready !== 'function' ||
+                typeof tg.expand !== 'function') {
+                setIsTelegram(false);
+                setIsLoading(false);
+                return;
+            }
+
+            // Additional check: verify that we have actual user data
+            if (!tg.initDataUnsafe.user) {
                 setIsTelegram(false);
                 setIsLoading(false);
                 return;
