@@ -15,20 +15,31 @@ export interface WithdrawalRequest {
 const SUPABASE_PROJECT_URL = import.meta.env.VITE_SUPABASE_PROJECT_URL; // e.g., "https://xxxxx.supabase.co"
 const SUPABASE_FUNCTION_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY; // Supabase anon key
 
+// For Railway deployment, we might use a custom API URL
+const CUSTOM_API_URL = import.meta.env.VITE_CUSTOM_API_URL; // Custom API URL for Railway functions
+
 // Construct the full API base URL for Supabase Edge Functions
-const API_BASE = SUPABASE_PROJECT_URL ? `${SUPABASE_PROJECT_URL}/functions/v1` : "http://localhost:8080";
+// If CUSTOM_API_URL is provided, use it instead of the Supabase functions URL
+const API_BASE = CUSTOM_API_URL || (SUPABASE_PROJECT_URL ? `${SUPABASE_PROJECT_URL}/functions/v1` : "http://localhost:8080");
 
 // Helper function to make API requests to Supabase Edge Functions
 const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
+  console.log(`Making API request to: ${API_BASE}${endpoint}`); // Adăugăm logging
+  console.log(`Request options:`, options); // Adăugăm logging
+
+  // For Railway deployment, we might not need the Authorization header
+  // or we might need to use a different authentication method
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${SUPABASE_FUNCTION_KEY}`,
+      // Temporarily removing authorization header for testing
+      // "Authorization": `Bearer ${SUPABASE_FUNCTION_KEY}`,
       ...options.headers,
     },
   });
 
+  console.log(`Response status: ${response.status}`); // Adăugăm logging
   if (!response.ok) {
     // Log the error response for debugging
     const errorText = await response.text();
@@ -36,7 +47,9 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}): Promise<
     throw new Error(`API request failed: ${response.status} ${response.statusText}`);
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log(`API response:`, result); // Adăugăm logging
+  return result;
 };
 
 // Sanitize user data to match UserState interface
@@ -139,6 +152,7 @@ export const syncUserWithDatabase = async (userData: Record<string, unknown>, lo
 
   try {
     console.log("Syncing user with database:", userData); // Adăugăm logging pentru debugging
+    console.log("Fingerprint:", fingerprint); // Adăugăm logging pentru debugging
 
     const response = await apiRequest("/sync-user", {
       method: "POST",
