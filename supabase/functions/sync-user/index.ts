@@ -171,10 +171,14 @@ serve(async (req: Request) => {
 
   try {
     const { telegramInitData, fingerprint } = await req.json();
+    console.log("Received telegramInitData:", telegramInitData); // Adăugăm logging pentru debugging
 
     // Verify Telegram authentication
     const telegramUser = await verifyTelegramData(telegramInitData);
+    console.log("Verified telegramUser:", telegramUser); // Adăugăm logging pentru debugging
+
     if (!telegramUser) {
+      console.log("Telegram verification failed for data:", telegramInitData); // Adăugăm logging pentru debugging
       return new Response(JSON.stringify({ success: false, error: "Invalid Telegram auth" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -182,6 +186,7 @@ serve(async (req: Request) => {
     }
 
     const telegramId = telegramUser.id;
+    console.log("Telegram ID:", telegramId); // Adăugăm logging pentru debugging
 
     // Check rate limit
     if (!checkRateLimit(telegramId.toString(), "sync-user")) {
@@ -198,10 +203,21 @@ serve(async (req: Request) => {
       .eq("telegram_id", telegramId)
       .single();
 
+    console.log("Existing user query result:", { existingUser, userError }); // Adăugăm logging pentru debugging
+
     let user;
     let isNewUser = false;
 
     if (userError || !existingUser) {
+      console.log("Creating new user with data:", { // Adăugăm logging pentru debugging
+        telegramId,
+        username: telegramUser.username,
+        firstName: telegramUser.first_name,
+        lastName: telegramUser.last_name,
+        photoUrl: telegramUser.photo_url,
+        fingerprint
+      });
+
       // Create new user
       const { data, error } = await supabase
         .from("users")
@@ -228,7 +244,10 @@ serve(async (req: Request) => {
 
       user = data;
       isNewUser = true;
+      console.log("New user created:", user); // Adăugăm logging pentru debugging
     } else {
+      console.log("Updating existing user:", existingUser); // Adăugăm logging pentru debugging
+
       // Update existing user
       const { data, error } = await supabase
         .from("users")
@@ -255,6 +274,7 @@ serve(async (req: Request) => {
       user = data;
     }
 
+    console.log("Final user data returned:", user); // Adăugăm logging pentru debugging
     return new Response(JSON.stringify({
       success: true,
       user: user,

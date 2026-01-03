@@ -138,20 +138,21 @@ export const syncUserWithDatabase = async (userData: Record<string, unknown>, lo
   if (!userData) return localState;
 
   try {
-    // Extract Telegram init data from WebApp
-    const telegramInitData = userData;
+    console.log("Syncing user with database:", userData); // Adăugăm logging pentru debugging
 
     const response = await apiRequest("/sync-user", {
       method: "POST",
       body: JSON.stringify({
-        telegramInitData: telegramInitData,
+        telegramInitData: userData,
         fingerprint: fingerprint,
       }),
     });
 
+    console.log("Sync response:", response); // Adăugăm logging pentru debugging
     return sanitizeUserData(response.user, localState);
   } catch (error) {
     console.error("Error syncing user with database:", error);
+    console.error("UserData that failed to sync:", userData); // Adăugăm logging pentru debugging
     return localState;
   }
 };
