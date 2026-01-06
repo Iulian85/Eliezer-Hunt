@@ -134,12 +134,12 @@ export const saveCollectionToFirebase = async (tgId: number, spawnId: string, va
         // Calculăm noile valori pentru balanțe
         const newBalance = (userData.balance || 0) + value;
         const newTonBalance = (userData.tonBalance || 0) + tonReward;
-        const newGameplayBalance = (userData.gameplayBalance || 0) + value;
-        const newRareBalance = (userData.rareBalance || 0) + value;
-        const newEventBalance = (userData.eventBalance || 0) + value;
-        const newDailySupplyBalance = (userData.dailySupplyBalance || 0) + value;
-        const newMerchantBalance = (userData.merchantBalance || 0) + value;
-        const newReferralBalance = (userData.referralBalance || 0) + value;
+        const newGameplayBalance = (userData.gameplayBalance || 0) + (category === 'GIFTBOX' || !category ? value : 0);
+        const newRareBalance = (userData.rareBalance || 0) + (category === 'LANDMARK' ? value : 0);
+        const newEventBalance = (userData.eventBalance || 0) + (category === 'EVENT' ? value : 0);
+        const newDailySupplyBalance = (userData.dailySupplyBalance || 0) + (category === 'AD_REWARD' ? value : 0);
+        const newMerchantBalance = (userData.merchantBalance || 0) + (category === 'MERCHANT' ? value : 0);
+        const newReferralBalance = (userData.referralBalance || 0) + 0; // Nu se modifică la colectare
 
         // Calculăm noile valori pentru contoare
         const newAdsWatched = (userData.adsWatched || 0) + (category === 'AD_REWARD' ? 1 : 0);

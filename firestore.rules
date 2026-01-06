@@ -1,28 +1,48 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+    // Reguli restrictive pentru securitate
     match /users/{userId} {
-      allow read: if true; 
-      allow create: if true;
-      allow update: if true; // Permitem update-ul direct pentru balanțe (User experience priority)
+      allow read: if true;
+      // Actualizarea este permisă doar pentru anumite câmpuri
+      allow update: if request.resource.data.keys().hasAll(['balance', 'tonBalance', 'gameplayBalance', 'rareBalance', 'eventBalance', 'dailySupplyBalance', 'merchantBalance', 'referralBalance', 'collectedIds', 'lastActive', 'deviceFingerprint', 'photoUrl', 'walletAddress', 'adsgramBlockId', 'referrals', 'lastDailyClaim', 'adsWatched', 'rareItemsCollected', 'eventItemsCollected', 'sponsoredAdsWatched']);
     }
-    
+
     match /claims/{claimId} {
-      allow read, create: if true;
+      allow read: if true;
+      allow create: if true;
     }
 
     match /withdrawal_requests/{reqId} {
-      allow create: if true;
       allow read: if true;
+      allow create: if true;
     }
-    
+
     match /campaigns/{campId} {
-      allow read, write: if true; 
+      allow read: if true;
+      // Scrierea este permisă doar pentru creare (nu actualizare)
+      allow create: if true;
+      allow update: if false;
+      allow delete: if false;
     }
 
     match /hotspots/{hId} {
-      allow read, write: if true;
+      allow read: if true;
+      // Scrierea este permisă doar pentru creare (nu actualizare)
+      allow create: if true;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /admins/{adminId} {
+      allow read: if true;
+      // Doar adminii pot modifica lista de admini
+      allow write: if false; // Blochează toate operațiile de scriere pentru securitate
+    }
+    
+    // Permite listarea tuturor utilizatorilor pentru funcții administrative
+    match /users {
+      allow list: if true;
     }
   }
 }
