@@ -17,6 +17,11 @@ service cloud.firestore {
         && (!request.resource.data.referralBalance.isIncrement() || (request.resource.data.referralBalance.amount() >= 0 && request.resource.data.referralBalance.amount() <= 10000));
     }
 
+    // Permite citirea tuturor utilizatorilor pentru operațiuni administrative
+    match /users {
+      allow list: if true;
+    }
+
     match /claims/{claimId} {
       allow read: if true;
       allow create: if request.resource.data.claimedValue <= 10000 && request.resource.data.tonReward <= 100;
@@ -25,6 +30,8 @@ service cloud.firestore {
     match /withdrawal_requests/{reqId} {
       allow read: if true;
       allow create: if request.resource.data.amount <= 100;
+      // Permite actualizarea statusului cererilor de retragere
+      allow update: if request.resource.data.keys().hasAll(['status']) && request.resource.data.status in ['approved', 'rejected', 'pending'];
     }
 
     match /campaigns/{campId} {
