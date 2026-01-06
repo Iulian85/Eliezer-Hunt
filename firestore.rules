@@ -5,26 +5,27 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if true;
       // Actualizarea este permisă doar pentru anumite câmpuri și cu limite
-      allow update: if request.auth != null 
-        && request.resource.data.keys().hasAll(['balance', 'tonBalance', 'gameplayBalance', 'rareBalance', 'eventBalance', 'dailySupplyBalance', 'merchantBalance', 'referralBalance', 'collectedIds', 'lastActive', 'deviceFingerprint', 'photoUrl', 'walletAddress', 'adsgramBlockId'])
-        && (request.resource.data.balance == resource.data.balance || request.resource.data.balance >= resource.data.balance)
-        && (request.resource.data.tonBalance == resource.data.tonBalance || request.resource.data.tonBalance >= resource.data.tonBalance);
+      allow update: if request.resource.data.keys().hasAll(['balance', 'tonBalance', 'gameplayBalance', 'rareBalance', 'eventBalance', 'dailySupplyBalance', 'merchantBalance', 'referralBalance', 'collectedIds', 'lastActive', 'deviceFingerprint', 'photoUrl', 'walletAddress', 'adsgramBlockId'])
+        && request.resource.data.balance >= resource.data.balance
+        && request.resource.data.balance <= resource.data.balance + 10000
+        && request.resource.data.tonBalance >= resource.data.tonBalance
+        && request.resource.data.tonBalance <= resource.data.tonBalance + 100;
     }
 
     match /claims/{claimId} {
       allow read: if true;
-      allow create: if request.auth != null && request.resource.data.claimedValue <= 10000 && request.resource.data.tonReward <= 100;
+      allow create: if request.resource.data.claimedValue <= 10000 && request.resource.data.tonReward <= 100;
     }
 
     match /withdrawal_requests/{reqId} {
       allow read: if true;
-      allow create: if request.auth != null && request.resource.data.amount <= 100;
+      allow create: if request.resource.data.amount <= 100;
     }
 
     match /campaigns/{campId} {
       allow read: if true;
       // Scrierea este permisă doar pentru creare (nu actualizare)
-      allow create: if request.auth != null;
+      allow create: if true;
       allow update: if false;
       allow delete: if false;
     }
@@ -32,7 +33,7 @@ service cloud.firestore {
     match /hotspots/{hId} {
       allow read: if true;
       // Scrierea este permisă doar pentru creare (nu actualizare)
-      allow create: if request.auth != null;
+      allow create: if true;
       allow update: if false;
       allow delete: if false;
     }
@@ -42,7 +43,7 @@ service cloud.firestore {
       // Doar adminii pot modifica lista de admini
       allow write: if false; // Blochează toate operațiile de scriere pentru securitate
     }
-    
+
     // Permite listarea tuturor utilizatorilor pentru funcții administrative
     match /users {
       allow list: if true;

@@ -123,37 +123,57 @@ export const saveCollectionToFirebase = async (tgId: number, spawnId: string, va
     const claimRef = collection(db, "claims");
 
     try {
+        // Citim documentul utilizatorului pentru a obține valorile actuale
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+            throw new Error(`User document does not exist for tgId: ${tgId}`);
+        }
+
+        const userData = userDoc.data();
+
+        // Calculăm noile valori pentru balanțe
+        const newBalance = (userData.balance || 0) + value;
+        const newTonBalance = (userData.tonBalance || 0) + tonReward;
+        const newGameplayBalance = (userData.gameplayBalance || 0) + value;
+        const newRareBalance = (userData.rareBalance || 0) + value;
+        const newEventBalance = (userData.eventBalance || 0) + value;
+        const newDailySupplyBalance = (userData.dailySupplyBalance || 0) + value;
+        const newMerchantBalance = (userData.merchantBalance || 0) + value;
+        const newReferralBalance = (userData.referralBalance || 0) + value;
+
+        // Calculăm noile valori pentru contoare
+        const newAdsWatched = (userData.adsWatched || 0) + (category === 'AD_REWARD' ? 1 : 0);
+        const newRareItemsCollected = (userData.rareItemsCollected || 0) + (category === 'LANDMARK' ? 1 : 0);
+        const newEventItemsCollected = (userData.eventItemsCollected || 0) + (category === 'EVENT' ? 1 : 0);
+        const newSponsoredAdsWatched = (userData.sponsoredAdsWatched || 0) + (category === 'MERCHANT' ? 1 : 0);
+
         const updateData: any = {
-            balance: increment(value),
-            tonBalance: increment(tonReward),
+            balance: newBalance,
+            tonBalance: newTonBalance,
+            gameplayBalance: newGameplayBalance,
+            rareBalance: newRareBalance,
+            eventBalance: newEventBalance,
+            dailySupplyBalance: newDailySupplyBalance,
+            merchantBalance: newMerchantBalance,
+            referralBalance: newReferralBalance,
             lastActive: serverTimestamp()
         };
+
+        // Adăugăm contoarele dacă sunt necesare
+        if (category === 'AD_REWARD') {
+            updateData.adsWatched = newAdsWatched;
+            updateData.lastDailyClaim = Date.now();
+        } else if (category === 'LANDMARK') {
+            updateData.rareItemsCollected = newRareItemsCollected;
+        } else if (category === 'EVENT') {
+            updateData.eventItemsCollected = newEventItemsCollected;
+        } else if (category === 'MERCHANT') {
+            updateData.sponsoredAdsWatched = newSponsoredAdsWatched;
+        }
 
         // Salvăm ID-ul ca să nu poată fi colectat de două ori (excepție reclamele zilnice)
         if (spawnId && !spawnId.startsWith('ad-')) {
             updateData.collectedIds = arrayUnion(spawnId);
-        }
-
-        // DISTRIBUȚIE PE CATEGORII (Pentru Airdrop Estimation în Wallet)
-        const cat = category || 'URBAN';
-        if (cat === 'AD_REWARD') {
-            updateData.dailySupplyBalance = increment(value);
-            updateData.adsWatched = increment(1);
-            updateData.lastDailyClaim = Date.now();
-        } else if (cat === 'LANDMARK') {
-            updateData.rareBalance = increment(value);
-            updateData.rareItemsCollected = increment(1);
-        } else if (cat === 'EVENT') {
-            updateData.eventBalance = increment(value);
-            updateData.eventItemsCollected = increment(1);
-        } else if (cat === 'MERCHANT') {
-            updateData.merchantBalance = increment(value);
-            updateData.sponsoredAdsWatched = increment(1);
-        } else if (cat === 'GIFTBOX') {
-            // Giftbox-urile merg la gameplay dacă dau puncte
-            updateData.gameplayBalance = increment(value);
-        } else {
-            updateData.gameplayBalance = increment(value);
         }
 
         // 1. Update balanță utilizator (Apare instant în Wallet prin onSnapshot)
