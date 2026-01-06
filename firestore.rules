@@ -7,10 +7,14 @@ service cloud.firestore {
       allow read: if true;
       // Actualizarea este permisă doar pentru anumite câmpuri și cu limite
       allow update: if request.resource.data.keys().hasAll(['balance', 'tonBalance', 'gameplayBalance', 'rareBalance', 'eventBalance', 'dailySupplyBalance', 'merchantBalance', 'referralBalance', 'collectedIds', 'lastActive', 'deviceFingerprint', 'photoUrl', 'walletAddress', 'adsgramBlockId'])
-        && request.resource.data.balance >= resource.data.balance
-        && request.resource.data.balance <= resource.data.balance + 10000
-        && request.resource.data.tonBalance >= resource.data.tonBalance
-        && request.resource.data.tonBalance <= resource.data.tonBalance + 100;
+        && (!request.resource.data.balance.isIncrement() || (request.resource.data.balance.amount() >= 0 && request.resource.data.balance.amount() <= 10000))
+        && (!request.resource.data.tonBalance.isIncrement() || (request.resource.data.tonBalance.amount() >= 0 && request.resource.data.tonBalance.amount() <= 100))
+        && (!request.resource.data.gameplayBalance.isIncrement() || (request.resource.data.gameplayBalance.amount() >= 0 && request.resource.data.gameplayBalance.amount() <= 10000))
+        && (!request.resource.data.rareBalance.isIncrement() || (request.resource.data.rareBalance.amount() >= 0 && request.resource.data.rareBalance.amount() <= 10000))
+        && (!request.resource.data.eventBalance.isIncrement() || (request.resource.data.eventBalance.amount() >= 0 && request.resource.data.eventBalance.amount() <= 10000))
+        && (!request.resource.data.dailySupplyBalance.isIncrement() || (request.resource.data.dailySupplyBalance.amount() >= 0 && request.resource.data.dailySupplyBalance.amount() <= 10000))
+        && (!request.resource.data.merchantBalance.isIncrement() || (request.resource.data.merchantBalance.amount() >= 0 && request.resource.data.merchantBalance.amount() <= 10000))
+        && (!request.resource.data.referralBalance.isIncrement() || (request.resource.data.referralBalance.amount() >= 0 && request.resource.data.referralBalance.amount() <= 10000));
     }
 
     match /claims/{claimId} {
