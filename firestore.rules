@@ -1,16 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Reguli restrictive pentru securitate
+    // Reguli pentru utilizatori - acces bazat pe Telegram ID
     match /users/{userId} {
       allow read: if true;
+      allow create: if true;  // Permite crearea conturilor noi
       // Actualizarea este permisă doar pentru anumite câmpuri
-      allow update: if request.resource.data.keys().hasOnly(['balance', 'tonBalance', 'gameplayBalance', 'rareBalance', 'eventBalance', 'dailySupplyBalance', 'merchantBalance', 'referralBalance', 'collectedIds', 'lastActive', 'deviceFingerprint', 'photoUrl', 'walletAddress', 'adsgramBlockId', 'referrals', 'lastDailyClaim', 'adsWatched', 'rareItemsCollected', 'eventItemsCollected', 'sponsoredAdsWatched']);
+      allow update: if request.resource.data.keys().hasOnly(['balance', 'tonBalance', 'gameplayBalance', 'rareBalance', 'eventBalance', 'dailySupplyBalance', 'merchantBalance', 'referralBalance', 'collectedIds', 'lastActive', 'deviceFingerprint', 'photoUrl', 'walletAddress', 'adsgramBlockId', 'referrals', 'lastDailyClaim', 'adsWatched', 'rareItemsCollected', 'eventItemsCollected', 'sponsoredAdsWatched', 'joinedAt', 'username', 'hasClaimedReferral', 'isBanned', 'biometricEnabled', 'referralNames', 'isAirdropped', 'airdropAllocation', 'airdropTimestamp']);
     }
 
     match /claims/{claimId} {
       allow read: if true;
-      allow create: if true;
+      allow create: if true;  // Permite crearea claimurilor
     }
 
     match /withdrawal_requests/{reqId} {
@@ -39,7 +40,7 @@ service cloud.firestore {
       // Doar adminii pot modifica lista de admini
       allow write: if false; // Blochează toate operațiile de scriere pentru securitate
     }
-    
+
     // Permite listarea tuturor utilizatorilor pentru funcții administrative
     match /users {
       allow list: if true;

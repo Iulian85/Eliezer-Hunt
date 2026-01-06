@@ -9,26 +9,52 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 import { UserState, HotspotCategory } from "../types";
 
+// Validate required environment variables
+const validateFirebaseConfig = () => {
+  const requiredVars = [
+    'VITE_FIREBASE_API_KEY',
+    'VITE_FIREBASE_AUTH_DOMAIN',
+    'VITE_FIREBASE_PROJECT_ID',
+    'VITE_FIREBASE_STORAGE_BUCKET',
+    'VITE_FIREBASE_MESSAGING_SENDER_ID',
+    'VITE_FIREBASE_APP_ID'
+  ];
+
+  const missingVars = requiredVars.filter(varName => !import.meta.env[varName]);
+
+  if (missingVars.length > 0) {
+    console.error('Missing required Firebase environment variables:', missingVars);
+    // Don't throw error to avoid breaking the app, but log it
+  }
+};
+
+validateFirebaseConfig();
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'dummy',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'dummy.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'dummy-project',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'dummy.appspot.com',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '123456789',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:123456789:web:abc123',
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-XXXXXXXXXX'
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 let app;
+let dbInstance = null;
+let functionsInstance = null;
+
 try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    dbInstance = getFirestore(app);
+    functionsInstance = getFunctions(app);
 } catch (error) {
     console.error("Firebase initialization error:", error);
-    app = null;
+    // Keep dbInstance and functionsInstance as null
 }
 
-export const db = app ? getFirestore(app) : null;
-export const functions = app ? getFunctions(app) : null;
+export const db = dbInstance;
+export const functions = functionsInstance;
 
 const sanitizeUserData = (data: any, defaults: UserState): UserState => {
     return {
@@ -125,11 +151,56 @@ export const saveCollectionToFirebase = async (tgId: number, spawnId: string, va
     try {
         // Citim documentul utilizatorului pentru a obține valorile actuale
         const userDoc = await getDoc(userRef);
+
+        // Dacă utilizatorul nu există, îl creăm cu date implicite
         if (!userDoc.exists()) {
-            throw new Error(`User document does not exist for tgId: ${tgId}`);
+            console.warn(`User document does not exist for tgId: ${tgId}, creating default user`);
+            const defaultUserData = {
+                telegramId: Number(tgId),
+                balance: 0,
+                tonBalance: 0,
+                gameplayBalance: 0,
+                rareBalance: 0,
+                eventBalance: 0,
+                dailySupplyBalance: 0,
+                merchantBalance: 0,
+                referralBalance: 0,
+                collectedIds: [],
+                lastActive: serverTimestamp(),
+                deviceFingerprint: 'unknown',
+                photoUrl: '',
+                walletAddress: '',
+                adsgramBlockId: '',
+                referrals: 0,
+                adsWatched: 0,
+                rareItemsCollected: 0,
+                eventItemsCollected: 0,
+                sponsoredAdsWatched: 0
+            };
+            await setDoc(userRef, defaultUserData);
         }
 
-        const userData = userDoc.data();
+        const userData = userDoc.exists() ? userDoc.data() : {
+            balance: 0,
+            tonBalance: 0,
+            gameplayBalance: 0,
+            rareBalance: 0,
+            eventBalance: 0,
+            dailySupplyBalance: 0,
+            merchantBalance: 0,
+            referralBalance: 0,
+            collectedIds: [],
+            lastActive: serverTimestamp(),
+            deviceFingerprint: 'unknown',
+            photoUrl: '',
+            walletAddress: '',
+            adsgramBlockId: '',
+            referrals: 0,
+            adsWatched: 0,
+            rareItemsCollected: 0,
+            eventItemsCollected: 0,
+            sponsoredAdsWatched: 0
+        };
 
         // Calculăm noile valori pentru balanțe
         const newBalance = (userData.balance || 0) + value;
@@ -183,7 +254,7 @@ export const saveCollectionToFirebase = async (tgId: number, spawnId: string, va
         await addDoc(claimRef, {
             userId: Number(tgId),
             spawnId: String(spawnId),
-            category: cat,
+            category: category || 'URBAN',
             claimedValue: Number(value),
             tonReward: Number(tonReward),
             status: 'verified',
