@@ -1,26 +1,21 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Reguli restrictive pentru securitate
     match /users/{userId} {
       allow read: if true;
-      // Actualizarea este permisă doar pentru anumite câmpuri și cu limite
-      allow update: if request.resource.data.keys() hasOnly ['balance', 'tonBalance', 'gameplayBalance', 'rareBalance', 'eventBalance', 'dailySupplyBalance', 'merchantBalance', 'referralBalance', 'collectedIds', 'lastActive', 'deviceFingerprint', 'photoUrl', 'walletAddress', 'adsgramBlockId']
-        && request.resource.data.balance >= resource.data.balance
-        && request.resource.data.balance <= resource.data.balance + 10000
-        && request.resource.data.tonBalance >= resource.data.tonBalance
-        && request.resource.data.tonBalance <= resource.data.tonBalance + 100;
+      // Actualizarea este permisă doar pentru anumite câmpuri
+      allow update: if request.resource.data.keys().hasOnly(['balance', 'tonBalance', 'gameplayBalance', 'rareBalance', 'eventBalance', 'dailySupplyBalance', 'merchantBalance', 'referralBalance', 'collectedIds', 'lastActive', 'deviceFingerprint', 'photoUrl', 'walletAddress', 'adsgramBlockId', 'referrals', 'lastDailyClaim', 'adsWatched', 'rareItemsCollected', 'eventItemsCollected', 'sponsoredAdsWatched']);
     }
 
     match /claims/{claimId} {
       allow read: if true;
-      allow create: if request.resource.data.claimedValue <= 10000 && request.resource.data.tonReward <= 100;
+      allow create: if true;
     }
 
     match /withdrawal_requests/{reqId} {
       allow read: if true;
-      allow create: if request.resource.data.amount <= 100;
+      allow create: if true;
     }
 
     match /campaigns/{campId} {
@@ -37,6 +32,17 @@ service cloud.firestore {
       allow create: if true;
       allow update: if false;
       allow delete: if false;
+    }
+
+    match /admins/{adminId} {
+      allow read: if true;
+      // Doar adminii pot modifica lista de admini
+      allow write: if false; // Blochează toate operațiile de scriere pentru securitate
+    }
+    
+    // Permite listarea tuturor utilizatorilor pentru funcții administrative
+    match /users {
+      allow list: if true;
     }
   }
 }
