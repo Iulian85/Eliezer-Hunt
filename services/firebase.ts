@@ -385,6 +385,41 @@ export const getAllUsersAdmin = async () => {
     const snapshot = await getDocs(collection(db, "users"));
     return snapshot.docs.map(d => ({id: d.id, ...d.data()}));
 };
+export const claimDailyReward = async (tgId: number) => {
+    if (!tgId || !db) return false;
+
+    const userRef = doc(db, "users", String(tgId));
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+        return false;
+    }
+
+    const userData = userDoc.data();
+    const lastDailyClaim = userData.lastDailyClaim || 0;
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+    // Check if 24 hours have passed since the last daily claim
+    if (now - lastDailyClaim < oneDayMs) {
+        return false; // Not enough time has passed
+    }
+
+    try {
+        // Update the user's balance and last daily claim time
+        await updateDoc(userRef, {
+            balance: increment(500), // Daily reward value
+            dailySupplyBalance: increment(500), // Add to daily supply balance
+            lastDailyClaim: now
+        });
+
+        return true;
+    } catch (e) {
+        console.error("Daily reward claim error:", e);
+        return false;
+    }
+};
+
 export const processWithdrawTON = async (tgId: number, amount: number) => {
     if (!db) return false;
     await addDoc(collection(db, "withdrawal_requests"), { userId: Number(tgId), amount: Number(amount), status: "pending", timestamp: serverTimestamp() });

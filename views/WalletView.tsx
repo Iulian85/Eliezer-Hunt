@@ -3,40 +3,42 @@ import React, { useState, useEffect } from 'react';
 import { TonConnectButton } from '@tonconnect/ui-react';
 import { Gift, Loader2, ShieldCheck, Coins, TrendingUp, Megaphone, Star, Sparkles, Clock, Users, Wallet, ArrowUpRight, MapPin, Target, ShoppingBag, Crown } from 'lucide-react';
 import { showRewardedAd } from '../services/adsgram';
-import { processWithdrawTON } from '../services/firebase';
+import { processWithdrawTON, claimDailyReward } from '../services/firebase';
 import { REWARD_AD_VALUE } from '../constants';
 import { UserState } from '../types';
 
 interface WalletViewProps {
     userState: UserState;
     onAdReward: (amount: number) => void;
+    onDailyReward: (amount: number) => void;
     onInvite: () => void;
     adsgramBlockId: string; // Adăugat pentru securitate
 }
 
 export const WalletView: React.FC<WalletViewProps> = ({
-    userState, onAdReward, onInvite, adsgramBlockId
+    userState, onAdReward, onDailyReward, onInvite, adsgramBlockId
 }) => {
     const [loadingAd, setLoadingAd] = useState(false);
+    const [loadingDaily, setLoadingDaily] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
     const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
     const [withdrawSuccess, setWithdrawSuccess] = useState(false);
 
-    const { 
-        balance, 
+    const {
+        balance,
         tonBalance = 0,
-        gameplayBalance = 0, 
-        rareBalance = 0, 
-        eventBalance = 0, 
+        gameplayBalance = 0,
+        rareBalance = 0,
+        eventBalance = 0,
         dailySupplyBalance = 0,
-        merchantBalance = 0, 
+        merchantBalance = 0,
         referralBalance = 0,
         referrals = 0,
         lastDailyClaim = 0
     } = userState;
 
     // Calcul Multiplicator
-    const MAX_MULTIPLIER = 2.5; 
+    const MAX_MULTIPLIER = 2.5;
     const rawMultiplier = 1 + (Math.log10(referrals + 1) / 4);
     const refMultiplier = Math.min(MAX_MULTIPLIER, rawMultiplier);
 
@@ -46,15 +48,15 @@ export const WalletView: React.FC<WalletViewProps> = ({
     useEffect(() => {
         const checkCooldown = () => {
             const now = Date.now();
-            const cooldownMs = 24 * 60 * 60 * 1000; 
+            const cooldownMs = 24 * 60 * 60 * 1000;
             const timeSinceLast = now - lastDailyClaim;
-            
+
             if (timeSinceLast < cooldownMs) {
                 const diff = cooldownMs - timeSinceLast;
                 const h = Math.floor(diff / (1000 * 60 * 60));
                 const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                 const s = Math.floor((diff % (1000 * 60)) / 1000);
-                
+
                 setTimeRemaining(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
             } else {
                 setTimeRemaining(null);
@@ -66,8 +68,23 @@ export const WalletView: React.FC<WalletViewProps> = ({
         return () => clearInterval(interval);
     }, [lastDailyClaim]);
 
+    const handleClaimDailyReward = async () => {
+        if (timeRemaining) return; // If still in cooldown, don't allow claiming
+        setLoadingDaily(true);
+
+        try {
+            const success = await claimDailyReward(userState.telegramId!);
+            if (success) {
+                onDailyReward(500); // Update local state with the reward
+            }
+        } catch (error) {
+            console.error("Failed to claim daily reward:", error);
+        } finally {
+            setLoadingDaily(false);
+        }
+    };
+
     const handleWatchAd = async () => {
-        if (timeRemaining) return;
         setLoadingAd(true);
         const success = await showRewardedAd(adsgramBlockId);
         setLoadingAd(false);
@@ -174,8 +191,22 @@ export const WalletView: React.FC<WalletViewProps> = ({
                         <p className="text-[10px] text-slate-400">+500 Pts (Daily Supply) {timeRemaining && <span className="text-amber-500 font-bold ml-1">• {timeRemaining}</span>}</p>
                     </div>
                 </div>
-                <button onClick={handleWatchAd} disabled={loadingAd || !!timeRemaining} className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-lg active:scale-95 ${timeRemaining ? "bg-slate-800 text-slate-600 cursor-not-allowed" : "bg-white text-black hover:bg-slate-200"}`}>
-                    {loadingAd ? <Loader2 className="animate-spin" size={14}/> : (timeRemaining ? "CLAIMED" : "CLAIM")}
+                <button onClick={handleClaimDailyReward} disabled={loadingDaily || !!timeRemaining} className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-lg active:scale-95 ${timeRemaining ? "bg-slate-800 text-slate-600 cursor-not-allowed" : "bg-white text-black hover:bg-slate-200"}`}>
+                    {loadingDaily ? <Loader2 className="animate-spin" size={14}/> : (timeRemaining ? "CLAIMED" : "CLAIM")}
+                </button>
+            </div>
+
+            {/* AD REWARD CARD */}
+            <div className="glass-panel p-5 rounded-3xl flex items-center justify-between mb-8 border border-white/5">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-blue-900/40 text-blue-400"><Sparkles size={24} /></div>
+                    <div>
+                        <h3 className="font-bold text-white text-sm">Ad Reward</h3>
+                        <p className="text-[10px] text-slate-400">+500 Pts (Daily Supply)</p>
+                    </div>
+                </div>
+                <button onClick={handleWatchAd} disabled={loadingAd} className="px-6 py-2.5 rounded-xl font-bold text-xs bg-white text-black hover:bg-slate-200 transition-all shadow-lg active:scale-95">
+                    {loadingAd ? <Loader2 className="animate-spin" size={14}/> : "WATCH"}
                 </button>
             </div>
 
