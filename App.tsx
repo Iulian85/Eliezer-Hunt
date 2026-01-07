@@ -78,32 +78,10 @@ function App() {
     const [biometricSupported, setBiometricSupported] = useState<boolean | null>(null);
     const [currentFingerprint, setCurrentFingerprint] = useState<string | null>(null);
 
-    const [isAdmin, setIsAdmin] = useState(false);
-
-    // Verificare server-side pentru admin
-    useEffect(() => {
-        const checkAdminStatus = async () => {
-            if (!userState.telegramId) {
-                setIsAdmin(false);
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/isAdmin', {
-                    headers: {
-                        'x-user-id': userState.telegramId.toString()
-                    }
-                });
-                const data = await response.json();
-                setIsAdmin(data.isAdmin);
-            } catch (error) {
-                console.error('Error checking admin status:', error);
-                setIsAdmin(false);
-            }
-        };
-
-        checkAdminStatus();
-    }, [userState.telegramId]);
+    const isAdmin = useMemo(() => {
+        // Verificare server-side pentru admin
+        return false; // Va fi gestionat de server
+    }, [userWalletAddress]);
 
     const allHotspots = useMemo(() => {
         const activeAdsAsHotspots: HotspotDefinition[] = campaigns
