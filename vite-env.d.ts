@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string
   readonly VITE_FIREBASE_MEASUREMENT_ID: string
   readonly VITE_TELEGRAM_BOT_TOKEN: string
+  readonly VITE_ADSGRAM_BLOCK_ID: string
   [key: string]: any
 }
 
