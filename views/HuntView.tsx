@@ -19,7 +19,7 @@ interface HuntViewProps {
     adsgramBlockId: string; // Adăugat pentru securitate
 }
 
-export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedIds, onCollect, hotspots }) => {
+export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedIds, onCollect, hotspots, adsgramBlockId }) => {
     const [nearestSpawn, setNearestSpawn] = useState<{ spawn: SpawnPoint, dist: number } | null>(null);
     const [arMode, setArMode] = useState(false);
 
