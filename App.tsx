@@ -8,11 +8,11 @@ import { generateRandomSpawns } from './utils';
 import { Sparkles, ShieldAlert, ExternalLink, UserX, AlertTriangle, Fingerprint, Lock, ShieldCheck, Loader2, SmartphoneNfc, RefreshCw, Settings, ShieldQuestion, Send } from 'lucide-react';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-import { 
-    syncUserWithFirebase, 
+import {
+    syncUserWithFirebase,
     saveCollectionToFirebase,
-    processReferralReward, 
-    subscribeToCampaigns, 
+    processReferralReward,
+    subscribeToCampaigns,
     subscribeToHotspots,
     subscribeToUserProfile,
     createCampaignFirebase,
@@ -21,8 +21,12 @@ import {
     saveHotspotFirebase,
     deleteHotspotFirebase,
     updateUserWalletInFirebase,
-    resetUserInFirebase
+    resetUserInFirebase,
+    db  // Adăugăm importul pentru db
 } from './services/firebase';
+
+// Importăm funcțiile necesare pentru verificarea adminului
+import { getDoc, doc } from "@firebase/firestore";
 
 import { MapView } from './views/MapView';
 import { HuntView } from './views/HuntView';
@@ -80,10 +84,10 @@ function App() {
 
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // Verificare server-side pentru admin
+    // Verificare admin folosind Firestore (alternativă la Cloud Functions)
     useEffect(() => {
         const checkAdminStatus = async () => {
-            if (!userState.telegramId) {
+            if (!userState.telegramId || !db) {
                 setIsAdmin(false);
                 return;
             }
@@ -91,24 +95,10 @@ function App() {
             console.log('Checking admin status for Telegram ID:', userState.telegramId);
 
             try {
-                // Folosim direct funcția Firebase Functions dacă avem acces la functions
-                if (window.location.hostname !== 'localhost' && typeof window !== 'undefined') {
-                    // În producție, folosim endpointul direct
-                    const response = await fetch('/api/isAdmin', {
-                        method: 'GET',
-                        headers: {
-                            'x-user-id': userState.telegramId.toString(),
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    const data = await response.json();
-                    console.log('Admin check response:', data);
-                    setIsAdmin(data.isAdmin);
-                } else {
-                    // Pentru localhost, putem face un apel direct către funcția Firebase Functions
-                    // sau folosim o metodă alternativă pentru debugging
-                    setIsAdmin(false); // Implicit false în localhost
-                }
+                const adminDoc = await getDoc(doc(db, "admins", userState.telegramId.toString()));
+                const isAdminUser = adminDoc.exists();
+                console.log('Admin check result:', isAdminUser);
+                setIsAdmin(isAdminUser);
             } catch (error) {
                 console.error('Error checking admin status:', error);
                 setIsAdmin(false);
