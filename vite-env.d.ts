@@ -1,6 +1,7 @@
 // Manually define ImportMetaEnv as 'vite/client' types are not resolvable
 interface ImportMetaEnv {
   readonly VITE_ADMIN_WALLET_ADDRESS: string
+  readonly VITE_ADSGRAM_BLOCK_ID: string
   readonly VITE_FIREBASE_API_KEY: string
   readonly VITE_FIREBASE_AUTH_DOMAIN: string
   readonly VITE_FIREBASE_PROJECT_ID: string
