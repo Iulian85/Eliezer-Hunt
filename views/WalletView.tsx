@@ -1,42 +1,40 @@
-
 import React, { useState, useEffect } from 'react';
 import { TonConnectButton } from '@tonconnect/ui-react';
 import { Gift, Loader2, ShieldCheck, Coins, TrendingUp, Megaphone, Star, Sparkles, Clock, Users, Wallet, ArrowUpRight, MapPin, Target, ShoppingBag, Crown } from 'lucide-react';
 import { showRewardedAd } from '../services/adsgram';
 import { processWithdrawTON } from '../services/firebase';
-import { REWARD_AD_VALUE } from '../constants';
+import { REWARD_AD_VALUE, ADSGRAM_BLOCK_ID } from '../constants';
 import { UserState } from '../types';
 
 interface WalletViewProps {
     userState: UserState;
     onAdReward: (amount: number) => void;
     onInvite: () => void;
-    adsgramBlockId: string; // Adăugat pentru securitate
 }
 
-export const WalletView: React.FC<WalletViewProps> = ({
-    userState, onAdReward, onInvite, adsgramBlockId
+export const WalletView: React.FC<WalletViewProps> = ({ 
+    userState, onAdReward, onInvite
 }) => {
     const [loadingAd, setLoadingAd] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
     const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
     const [withdrawSuccess, setWithdrawSuccess] = useState(false);
 
-    const {
-        balance,
+    const { 
+        balance, 
         tonBalance = 0,
-        gameplayBalance = 0,
-        rareBalance = 0,
-        eventBalance = 0,
+        gameplayBalance = 0, 
+        rareBalance = 0, 
+        eventBalance = 0, 
         dailySupplyBalance = 0,
-        merchantBalance = 0,
+        merchantBalance = 0, 
         referralBalance = 0,
         referrals = 0,
         lastDailyClaim = 0
     } = userState;
 
     // Calcul Multiplicator
-    const MAX_MULTIPLIER = 2.5;
+    const MAX_MULTIPLIER = 2.5; 
     const rawMultiplier = 1 + (Math.log10(referrals + 1) / 4);
     const refMultiplier = Math.min(MAX_MULTIPLIER, rawMultiplier);
 
@@ -46,15 +44,15 @@ export const WalletView: React.FC<WalletViewProps> = ({
     useEffect(() => {
         const checkCooldown = () => {
             const now = Date.now();
-            const cooldownMs = 24 * 60 * 60 * 1000;
+            const cooldownMs = 24 * 60 * 60 * 1000; 
             const timeSinceLast = now - lastDailyClaim;
-
+            
             if (timeSinceLast < cooldownMs) {
                 const diff = cooldownMs - timeSinceLast;
                 const h = Math.floor(diff / (1000 * 60 * 60));
                 const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                 const s = Math.floor((diff % (1000 * 60)) / 1000);
-
+                
                 setTimeRemaining(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
             } else {
                 setTimeRemaining(null);
@@ -69,7 +67,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
     const handleWatchAd = async () => {
         if (timeRemaining) return;
         setLoadingAd(true);
-        const success = await showRewardedAd(adsgramBlockId);
+        const success = await showRewardedAd(ADSGRAM_BLOCK_ID);
         setLoadingAd(false);
         if (success) onAdReward(REWARD_AD_VALUE);
     };
