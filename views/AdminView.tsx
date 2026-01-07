@@ -8,8 +8,6 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
 import { getAllUsersAdmin, deleteUserFirebase, toggleUserBan, resetUserInFirebase, toggleUserBiometricSetting, markUserAirdropped, subscribeToWithdrawalRequests, updateWithdrawalStatus } from '../services/firebase';
-import { getDoc, doc } from 'firebase/firestore';
-import { db } from '../services/firebase';
 
 interface AdminViewProps {
     allCampaigns: Campaign[];
@@ -50,21 +48,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const [isExecutingPayment, setIsExecutingPayment] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Verificare admin la încărcare - folosind Firestore
+    // Verificare admin la încărcare
     useEffect(() => {
         const checkAdmin = async () => {
-            if (!userTelegramId || !db) {
-                setIsAdmin(false);
-                return;
-            }
-
             try {
-                const adminDoc = await getDoc(doc(db, "admins", userTelegramId.toString()));
-                const isAdminUser = adminDoc.exists();
-                setIsAdmin(isAdminUser);
+                const response = await fetch('/api/is-admin', {
+                    headers: { 'x-user-id': userTelegramId.toString() }
+                });
+                const data = await response.json();
+                setIsAdmin(data.isAdmin);
             } catch (error) {
                 console.error('Error checking admin status:', error);
-                setIsAdmin(false);
             }
         };
         checkAdmin();

@@ -9,52 +9,26 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 import { UserState, HotspotCategory } from "../types";
 
-// Validate required environment variables
-const validateFirebaseConfig = () => {
-  const requiredVars = [
-    'VITE_FIREBASE_API_KEY',
-    'VITE_FIREBASE_AUTH_DOMAIN',
-    'VITE_FIREBASE_PROJECT_ID',
-    'VITE_FIREBASE_STORAGE_BUCKET',
-    'VITE_FIREBASE_MESSAGING_SENDER_ID',
-    'VITE_FIREBASE_APP_ID'
-  ];
-
-  const missingVars = requiredVars.filter(varName => !import.meta.env[varName]);
-
-  if (missingVars.length > 0) {
-    console.error('Missing required Firebase environment variables:', missingVars);
-    // Don't throw error to avoid breaking the app, but log it
-  }
-};
-
-validateFirebaseConfig();
-
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'dummy',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'dummy.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'dummy-project',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'dummy.appspot.com',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '123456789',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:123456789:web:abc123',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-XXXXXXXXXX'
 };
 
 let app;
-let dbInstance = null;
-let functionsInstance = null;
-
 try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    dbInstance = getFirestore(app);
-    functionsInstance = getFunctions(app);
 } catch (error) {
     console.error("Firebase initialization error:", error);
-    // Keep dbInstance and functionsInstance as null
+    app = null;
 }
 
-export const db = dbInstance;
-export const functions = functionsInstance;
+export const db = app ? getFirestore(app) : null;
+export const functions = app ? getFunctions(app) : null;
 
 const sanitizeUserData = (data: any, defaults: UserState): UserState => {
     return {
@@ -149,102 +123,37 @@ export const saveCollectionToFirebase = async (tgId: number, spawnId: string, va
     const claimRef = collection(db, "claims");
 
     try {
-        // Citim documentul utilizatorului pentru a obține valorile actuale
-        const userDoc = await getDoc(userRef);
-
-        // Dacă utilizatorul nu există, îl creăm cu date implicite
-        if (!userDoc.exists()) {
-            console.warn(`User document does not exist for tgId: ${tgId}, creating default user`);
-            const defaultUserData = {
-                telegramId: Number(tgId),
-                balance: 0,
-                tonBalance: 0,
-                gameplayBalance: 0,
-                rareBalance: 0,
-                eventBalance: 0,
-                dailySupplyBalance: 0,
-                merchantBalance: 0,
-                referralBalance: 0,
-                collectedIds: [],
-                lastActive: serverTimestamp(),
-                deviceFingerprint: 'unknown',
-                photoUrl: '',
-                walletAddress: '',
-                adsgramBlockId: '',
-                referrals: 0,
-                adsWatched: 0,
-                rareItemsCollected: 0,
-                eventItemsCollected: 0,
-                sponsoredAdsWatched: 0
-            };
-            await setDoc(userRef, defaultUserData);
-        }
-
-        const userData = userDoc.exists() ? userDoc.data() : {
-            balance: 0,
-            tonBalance: 0,
-            gameplayBalance: 0,
-            rareBalance: 0,
-            eventBalance: 0,
-            dailySupplyBalance: 0,
-            merchantBalance: 0,
-            referralBalance: 0,
-            collectedIds: [],
-            lastActive: serverTimestamp(),
-            deviceFingerprint: 'unknown',
-            photoUrl: '',
-            walletAddress: '',
-            adsgramBlockId: '',
-            referrals: 0,
-            adsWatched: 0,
-            rareItemsCollected: 0,
-            eventItemsCollected: 0,
-            sponsoredAdsWatched: 0
-        };
-
-        // Calculăm noile valori pentru balanțe
-        const newBalance = (userData.balance || 0) + value;
-        const newTonBalance = (userData.tonBalance || 0) + tonReward;
-        const newGameplayBalance = (userData.gameplayBalance || 0) + (category === 'GIFTBOX' || !category ? value : 0);
-        const newRareBalance = (userData.rareBalance || 0) + (category === 'LANDMARK' ? value : 0);
-        const newEventBalance = (userData.eventBalance || 0) + (category === 'EVENT' ? value : 0);
-        const newDailySupplyBalance = (userData.dailySupplyBalance || 0) + (category === 'AD_REWARD' ? value : 0);
-        const newMerchantBalance = (userData.merchantBalance || 0) + (category === 'MERCHANT' ? value : 0);
-        const newReferralBalance = (userData.referralBalance || 0) + 0; // Nu se modifică la colectare
-
-        // Calculăm noile valori pentru contoare
-        const newAdsWatched = (userData.adsWatched || 0) + (category === 'AD_REWARD' ? 1 : 0);
-        const newRareItemsCollected = (userData.rareItemsCollected || 0) + (category === 'LANDMARK' ? 1 : 0);
-        const newEventItemsCollected = (userData.eventItemsCollected || 0) + (category === 'EVENT' ? 1 : 0);
-        const newSponsoredAdsWatched = (userData.sponsoredAdsWatched || 0) + (category === 'MERCHANT' ? 1 : 0);
-
         const updateData: any = {
-            balance: newBalance,
-            tonBalance: newTonBalance,
-            gameplayBalance: newGameplayBalance,
-            rareBalance: newRareBalance,
-            eventBalance: newEventBalance,
-            dailySupplyBalance: newDailySupplyBalance,
-            merchantBalance: newMerchantBalance,
-            referralBalance: newReferralBalance,
+            balance: increment(value),
+            tonBalance: increment(tonReward),
             lastActive: serverTimestamp()
         };
-
-        // Adăugăm contoarele dacă sunt necesare
-        if (category === 'AD_REWARD') {
-            updateData.adsWatched = newAdsWatched;
-            updateData.lastDailyClaim = Date.now();
-        } else if (category === 'LANDMARK') {
-            updateData.rareItemsCollected = newRareItemsCollected;
-        } else if (category === 'EVENT') {
-            updateData.eventItemsCollected = newEventItemsCollected;
-        } else if (category === 'MERCHANT') {
-            updateData.sponsoredAdsWatched = newSponsoredAdsWatched;
-        }
 
         // Salvăm ID-ul ca să nu poată fi colectat de două ori (excepție reclamele zilnice)
         if (spawnId && !spawnId.startsWith('ad-')) {
             updateData.collectedIds = arrayUnion(spawnId);
+        }
+
+        // DISTRIBUȚIE PE CATEGORII (Pentru Airdrop Estimation în Wallet)
+        const cat = category || 'URBAN';
+        if (cat === 'AD_REWARD') {
+            updateData.dailySupplyBalance = increment(value);
+            updateData.adsWatched = increment(1);
+            updateData.lastDailyClaim = Date.now();
+        } else if (cat === 'LANDMARK') {
+            updateData.rareBalance = increment(value);
+            updateData.rareItemsCollected = increment(1);
+        } else if (cat === 'EVENT') {
+            updateData.eventBalance = increment(value);
+            updateData.eventItemsCollected = increment(1);
+        } else if (cat === 'MERCHANT') {
+            updateData.merchantBalance = increment(value);
+            updateData.sponsoredAdsWatched = increment(1);
+        } else if (cat === 'GIFTBOX') {
+            // Giftbox-urile merg la gameplay dacă dau puncte
+            updateData.gameplayBalance = increment(value);
+        } else {
+            updateData.gameplayBalance = increment(value);
         }
 
         // 1. Update balanță utilizator (Apare instant în Wallet prin onSnapshot)
@@ -254,7 +163,7 @@ export const saveCollectionToFirebase = async (tgId: number, spawnId: string, va
         await addDoc(claimRef, {
             userId: Number(tgId),
             spawnId: String(spawnId),
-            category: category || 'URBAN',
+            category: cat,
             claimedValue: Number(value),
             tonReward: Number(tonReward),
             status: 'verified',

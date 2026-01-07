@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { TonConnectButton } from '@tonconnect/ui-react';
 import { Gift, Loader2, ShieldCheck, Coins, TrendingUp, Megaphone, Star, Sparkles, Clock, Users, Wallet, ArrowUpRight, MapPin, Target, ShoppingBag, Crown } from 'lucide-react';
