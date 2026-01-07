@@ -42,7 +42,7 @@ const DriftingCoin = ({ coinRef, initialPos, onDistanceChange, onEscape, isPause
     return null;
 };
 
-export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect, adsgramBlockId }) => {
+export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const coinGroupRef = useRef<THREE.Group>(null);
     const [permissionError, setPermissionError] = useState(false);

@@ -14,8 +14,8 @@ interface WalletViewProps {
     adsgramBlockId: string; // Adăugat pentru securitate
 }
 
-export const WalletView: React.FC<WalletViewProps> = ({
-    userState, onAdReward, onInvite, adsgramBlockId
+export const WalletView: React.FC<WalletViewProps> = ({ 
+    userState, onAdReward, onInvite
 }) => {
     const [loadingAd, setLoadingAd] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
