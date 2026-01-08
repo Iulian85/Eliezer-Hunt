@@ -8,11 +8,11 @@ import { generateRandomSpawns } from './utils';
 import { Sparkles, ShieldAlert, ExternalLink, UserX, AlertTriangle, Fingerprint, Lock, ShieldCheck, Loader2, SmartphoneNfc, RefreshCw, Settings, ShieldQuestion, Send } from 'lucide-react';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-import { 
-    syncUserWithFirebase, 
+import {
+    syncUserWithFirebase,
     saveCollectionToFirebase,
-    processReferralReward, 
-    subscribeToCampaigns, 
+    processReferralReward,
+    subscribeToCampaigns,
     subscribeToHotspots,
     subscribeToUserProfile,
     createCampaignFirebase,
@@ -21,8 +21,12 @@ import {
     saveHotspotFirebase,
     deleteHotspotFirebase,
     updateUserWalletInFirebase,
-    resetUserInFirebase
+    resetUserInFirebase,
+    db  // Adăugăm importul pentru db
 } from './services/firebase';
+
+// Importăm funcțiile necesare pentru verificarea adminului
+import { getDoc, doc } from "@firebase/firestore";
 
 import { MapView } from './views/MapView';
 import { HuntView } from './views/HuntView';
@@ -78,10 +82,31 @@ function App() {
     const [biometricSupported, setBiometricSupported] = useState<boolean | null>(null);
     const [currentFingerprint, setCurrentFingerprint] = useState<string | null>(null);
 
-    const isAdmin = useMemo(() => {
-        // Verificare server-side pentru admin
-        return false; // Va fi gestionat de server
-    }, [userWalletAddress]);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Verificare admin folosind Firestore (alternativă la Cloud Functions)
+    useEffect(() => {
+        const checkAdminStatus = async () => {
+            if (!userState.telegramId || !db) {
+                setIsAdmin(false);
+                return;
+            }
+
+            console.log('Checking admin status for Telegram ID:', userState.telegramId);
+
+            try {
+                const adminDoc = await getDoc(doc(db, "admins", userState.telegramId.toString()));
+                const isAdminUser = adminDoc.exists();
+                console.log('Admin check result:', isAdminUser);
+                setIsAdmin(isAdminUser);
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+                setIsAdmin(false);
+            }
+        };
+
+        checkAdminStatus();
+    }, [userState.telegramId]);
 
     const allHotspots = useMemo(() => {
         const activeAdsAsHotspots: HotspotDefinition[] = campaigns
