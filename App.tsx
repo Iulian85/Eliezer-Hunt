@@ -78,45 +78,10 @@ function App() {
     const [biometricSupported, setBiometricSupported] = useState<boolean | null>(null);
     const [currentFingerprint, setCurrentFingerprint] = useState<string | null>(null);
 
-    const [isAdmin, setIsAdmin] = useState(false);
-
-    // Verificare server-side pentru admin
-    useEffect(() => {
-        const checkAdminStatus = async () => {
-            if (!userState.telegramId) {
-                setIsAdmin(false);
-                return;
-            }
-
-            console.log('Checking admin status for Telegram ID:', userState.telegramId);
-
-            try {
-                // Folosim direct funcția Firebase Functions dacă avem acces la functions
-                if (window.location.hostname !== 'localhost' && typeof window !== 'undefined') {
-                    // În producție, folosim endpointul direct
-                    const response = await fetch('/api/isAdmin', {
-                        method: 'GET',
-                        headers: {
-                            'x-user-id': userState.telegramId.toString(),
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    const data = await response.json();
-                    console.log('Admin check response:', data);
-                    setIsAdmin(data.isAdmin);
-                } else {
-                    // Pentru localhost, putem face un apel direct către funcția Firebase Functions
-                    // sau folosim o metodă alternativă pentru debugging
-                    setIsAdmin(false); // Implicit false în localhost
-                }
-            } catch (error) {
-                console.error('Error checking admin status:', error);
-                setIsAdmin(false);
-            }
-        };
-
-        checkAdminStatus();
-    }, [userState.telegramId]);
+    const isAdmin = useMemo(() => {
+        // Verificare server-side pentru admin
+        return false; // Va fi gestionat de server
+    }, [userWalletAddress]);
 
     const allHotspots = useMemo(() => {
         const activeAdsAsHotspots: HotspotDefinition[] = campaigns
