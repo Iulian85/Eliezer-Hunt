@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useTonAddress } from '@tonconnect/ui-react';
 import { Navigation } from './components/Navigation';
 import { Tab, UserState, SpawnPoint, Coordinate, Campaign, AdStatus, HotspotDefinition, HotspotCategory } from './types';
-import { GLOBAL_SPAWNS, GLOBAL_HOTSPOTS } from './constants';
+import { GLOBAL_SPAWNS, GLOBAL_HOTSPOTS, ADMIN_WALLET_ADDRESS } from './constants';
 import { generateRandomSpawns } from './utils';
 import { Sparkles, ShieldAlert, ExternalLink, UserX, AlertTriangle, Fingerprint, Lock, ShieldCheck, Loader2, SmartphoneNfc, RefreshCw, Settings, ShieldQuestion, Send } from 'lucide-react';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
@@ -79,8 +79,7 @@ function App() {
     const [currentFingerprint, setCurrentFingerprint] = useState<string | null>(null);
 
     const isAdmin = useMemo(() => {
-        // Verificare server-side pentru admin
-        return false; // Va fi gestionat de server
+        return userWalletAddress && userWalletAddress === ADMIN_WALLET_ADDRESS;
     }, [userWalletAddress]);
 
     const allHotspots = useMemo(() => {
@@ -110,7 +109,7 @@ function App() {
 
         const initUser = async () => {
             const tg = window.Telegram?.WebApp;
-
+            
             if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
                 setIsTelegram(false);
                 setIsLoading(false);
@@ -130,8 +129,8 @@ function App() {
             const tgUser = tg.initDataUnsafe.user;
             const userId = tgUser.id.toString();
 
-            const userData = {
-                id: parseInt(userId),
+            const userData = { 
+                id: parseInt(userId), 
                 username: tgUser.username,
                 firstName: tgUser.first_name,
                 lastName: tgUser.last_name,
@@ -177,15 +176,6 @@ function App() {
                     setUserState(prev => ({ ...prev, ...updatedData }));
                     if (updatedData.isBanned) setIsBlocked(true);
                 });
-
-                // Obține adsgramBlockId de la server
-                try {
-                    const response = await fetch('/api/getAdsgramBlockId');
-                    const data = await response.json();
-                    setUserState(prev => ({ ...prev, adsgramBlockId: data.adsgramBlockId }));
-                } catch (error) {
-                    console.error('Error getting adsgramBlockId:', error);
-                }
 
             } catch (err) {
                 console.error("Initialization Error:", err);
@@ -422,7 +412,7 @@ function App() {
                     </p>
                 </div>
 
-                <style dangerouslySetInnerHTML={{__html: `
+                <style>{`
                     @keyframes scan {
                         0% { transform: translateY(0); opacity: 0; }
                         50% { opacity: 1; }
@@ -431,7 +421,7 @@ function App() {
                     .animate-scan {
                         animation: scan 1.5s ease-in-out infinite;
                     }
-                `}}></style>
+                `}</style>
             </div>
         );
     }
@@ -440,14 +430,13 @@ function App() {
         <div className="h-screen w-screen bg-slate-950 text-white flex flex-col relative overflow-hidden">
             <div className="flex-1 relative overflow-hidden">
                 {activeTab === Tab.MAP && <MapView location={userState.location || DEFAULT_LOCATION} spawns={spawns} collectedIds={userState.collectedIds} hotspots={allHotspots} />}
-                {activeTab === Tab.HUNT && <HuntView location={userState.location || DEFAULT_LOCATION} spawns={spawns} collectedIds={userState.collectedIds} onCollect={handleCollect} hotspots={allHotspots} adsgramBlockId={userState.adsgramBlockId || ''} />}
+                {activeTab === Tab.HUNT && <HuntView location={userState.location || DEFAULT_LOCATION} spawns={spawns} collectedIds={userState.collectedIds} onCollect={handleCollect} hotspots={allHotspots} />}
                 {activeTab === Tab.LEADERBOARD && <LeaderboardView />}
                 {activeTab === Tab.WALLET && (
-                    <WalletView
+                    <WalletView 
                         userState={userState}
-                        onAdReward={(amt) => handleCollect('ad-' + Date.now(), amt, 'AD_REWARD')}
-                        onInvite={handleInvite}
-                        adsgramBlockId={userState.adsgramBlockId || ''}
+                        onAdReward={(amt) => handleCollect('ad-' + Date.now(), amt, 'AD_REWARD')} 
+                        onInvite={handleInvite} 
                     />
                 )}
                 {activeTab === Tab.FRENS && <FrensView referralCount={userState.referrals} referralNames={userState.referralNames} onInvite={handleInvite} />}
@@ -475,24 +464,23 @@ function App() {
                     />
                 )}
                 {activeTab === Tab.ADMIN && (
-                    <AdminView
-                        allCampaigns={campaigns}
-                        customHotspots={customHotspots}
+                    <AdminView 
+                        allCampaigns={campaigns} 
+                        customHotspots={customHotspots} 
                         onSaveHotspots={async (newHotspots) => {
                             for (const h of newHotspots) await saveHotspotFirebase(h);
-                        }}
+                        }} 
                         onDeleteHotspot={async (id) => {
                             await deleteHotspotFirebase(id);
                         }}
                         onDeleteCampaign={async (id) => {
                             await deleteCampaignFirebase(id);
                         }}
-                        onApprove={(id) => updateCampaignStatusFirebase(id, AdStatus.ACTIVE)}
-                        onReject={(id) => updateCampaignStatusFirebase(id, AdStatus.REJECTED)}
-                        onResetMyAccount={handleResetAccount}
-                        isTestMode={isTestMode}
-                        onToggleTestMode={() => setIsTestMode(!isTestMode)}
-                        userTelegramId={userState.telegramId?.toString() || ''}
+                        onApprove={(id) => updateCampaignStatusFirebase(id, AdStatus.ACTIVE)} 
+                        onReject={(id) => updateCampaignStatusFirebase(id, AdStatus.REJECTED)} 
+                        onResetMyAccount={handleResetAccount} 
+                        isTestMode={isTestMode} 
+                        onToggleTestMode={() => setIsTestMode(!isTestMode)} 
                     />
                 )}
             </div>
@@ -510,7 +498,7 @@ function App() {
 
             <div className="fixed bottom-0 left-0 right-0 z-[9999] p-4 mb-2 pointer-events-none">
                 <div className="pointer-events-auto">
-                    <Navigation currentTab={activeTab} onTabChange={setActiveTab} userWalletAddress={userWalletAddress} userTelegramId={userState.telegramId?.toString() || ''} />
+                    <Navigation currentTab={activeTab} onTabChange={setActiveTab} userWalletAddress={userWalletAddress} />
                 </div>
             </div>
         </div>

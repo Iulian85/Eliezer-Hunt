@@ -16,10 +16,9 @@ interface HuntViewProps {
     collectedIds: string[];
     onCollect: (id: string, value: number, category?: any) => void;
     hotspots: HotspotDefinition[];
-    adsgramBlockId: string; // Adăugat pentru securitate
 }
 
-export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedIds, onCollect, hotspots, adsgramBlockId }) => {
+export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedIds, onCollect, hotspots }) => {
     const [nearestSpawn, setNearestSpawn] = useState<{ spawn: SpawnPoint, dist: number } | null>(null);
     const [arMode, setArMode] = useState(false);
 
@@ -78,7 +77,7 @@ export const HuntView: React.FC<HuntViewProps> = ({ location, spawns, collectedI
     };
 
     if (arMode) {
-        return <ARView target={nearestSpawn} onClose={() => setArMode(false)} onCollect={handleARCollect} adsgramBlockId={adsgramBlockId} />;
+        return <ARView target={nearestSpawn} onClose={() => setArMode(false)} onCollect={handleARCollect} />;
     }
 
     return (

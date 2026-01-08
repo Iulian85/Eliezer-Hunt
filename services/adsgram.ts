@@ -1,3 +1,5 @@
+import { ADSGRAM_BLOCK_ID } from '../constants';
+
 declare global {
     interface Window {
         Adsgram?: {
@@ -29,8 +31,8 @@ const loadAdsgramScript = (): Promise<void> => {
     });
 };
 
-// blockId trebuie să fie primit de la server pentru securitate
-export const showRewardedAd = async (blockId: string): Promise<boolean> => {
+// Uses the centralized constant by default
+export const showRewardedAd = async (blockId: string = ADSGRAM_BLOCK_ID): Promise<boolean> => {
     try {
         if (!blockId || blockId.trim() === '') {
             return false;
@@ -42,8 +44,8 @@ export const showRewardedAd = async (blockId: string): Promise<boolean> => {
             return false;
         }
 
-        const AdController = window.Adsgram.init({
-            blockId
+        const AdController = window.Adsgram.init({ 
+            blockId 
         });
 
         await AdController.show();

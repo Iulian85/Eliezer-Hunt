@@ -10,28 +10,7 @@ interface UniversalVideoPlayerProps {
 
 export const UniversalVideoPlayer: React.FC<UniversalVideoPlayerProps> = ({ url, autoPlay, onEnded, className }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
-
-    // Validare URL pentru prevenirea XSS
-    const isValidUrl = (url: string): boolean => {
-        try {
-            const parsedUrl = new URL(url);
-            return ['https:', 'http:'].includes(parsedUrl.protocol) &&
-                   (parsedUrl.hostname.includes('youtube.com') ||
-                    parsedUrl.hostname.includes('youtu.be') ||
-                    parsedUrl.hostname.includes('googlevideo.com') ||
-                    parsedUrl.hostname.includes('ggpht.com'));
-        } catch {
-            return false;
-        }
-    };
-
     const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-    const isValid = isValidUrl(url);
-
-    if (!isValid) {
-        console.error('Invalid video URL:', url);
-        return <div className={className}>Invalid video URL</div>;
-    }
 
     useEffect(() => {
         if (!isYouTube && videoRef.current && autoPlay) {
@@ -52,25 +31,18 @@ export const UniversalVideoPlayer: React.FC<UniversalVideoPlayerProps> = ({ url,
     if (isYouTube) {
         let videoId = '';
         if (url.includes('v=')) {
-            videoId = url.split('v=')[1].split(/[&\?]/)[0];
+            videoId = url.split('v=')[1].split('&')[0];
         } else if (url.includes('youtu.be/')) {
-            videoId = url.split('youtu.be/')[1].split(/[&\?]/)[0];
+            videoId = url.split('youtu.be/')[1].split('?')[0];
         } else {
             videoId = url.split('/').pop() || '';
-        }
-
-        // Curățăm videoId pentru a preveni XSS
-        videoId = videoId.replace(/[^a-zA-Z0-9_-]/g, '');
-
-        if (!videoId) {
-            return <div className={className}>Invalid YouTube URL</div>;
         }
 
         // Adăugăm parametri pentru autoplay, mute=0 (încercăm cu sunet), playsinline și permitere API
         // Parametrul 'autoplay=1' funcționează de obicei doar dacă există interacțiune prealabilă sau dacă video e muted=1.
         // Aici mizăm pe tap-ul utilizatorului pe monedă.
         const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&rel=0&playsinline=1&enablejsapi=1&modestbranding=1`;
-
+        
         return (
             <div className={`relative overflow-hidden ${className}`}>
                 <iframe

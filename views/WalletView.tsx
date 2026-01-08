@@ -4,18 +4,17 @@ import { TonConnectButton } from '@tonconnect/ui-react';
 import { Gift, Loader2, ShieldCheck, Coins, TrendingUp, Megaphone, Star, Sparkles, Clock, Users, Wallet, ArrowUpRight, MapPin, Target, ShoppingBag, Crown } from 'lucide-react';
 import { showRewardedAd } from '../services/adsgram';
 import { processWithdrawTON } from '../services/firebase';
-import { REWARD_AD_VALUE } from '../constants';
+import { REWARD_AD_VALUE, ADSGRAM_BLOCK_ID } from '../constants';
 import { UserState } from '../types';
 
 interface WalletViewProps {
     userState: UserState;
     onAdReward: (amount: number) => void;
     onInvite: () => void;
-    adsgramBlockId: string; // Adăugat pentru securitate
 }
 
-export const WalletView: React.FC<WalletViewProps> = ({
-    userState, onAdReward, onInvite, adsgramBlockId
+export const WalletView: React.FC<WalletViewProps> = ({ 
+    userState, onAdReward, onInvite
 }) => {
     const [loadingAd, setLoadingAd] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
@@ -69,7 +68,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
     const handleWatchAd = async () => {
         if (timeRemaining) return;
         setLoadingAd(true);
-        const success = await showRewardedAd(adsgramBlockId);
+        const success = await showRewardedAd(ADSGRAM_BLOCK_ID);
         setLoadingAd(false);
         if (success) onAdReward(REWARD_AD_VALUE);
     };

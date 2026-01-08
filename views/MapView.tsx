@@ -44,21 +44,8 @@ const createStyledIcon = (category: HotspotCategory | undefined, densityValue: n
         badgeText = "AD";
     }
 
-    // Sanitizare pentru logoUrl și badgeText pentru a preveni XSS
-    const sanitizedLogoUrl = logoUrl ? logoUrl.replace(/[^a-zA-Z0-9:/_.-]/g, '') : '';
-    const sanitizedBadgeText = badgeText.replace(/[<>'"&]/g, (match) => {
-        const escapeMap: Record<string, string> = {
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#x27;',
-            '&': '&amp;'
-        };
-        return escapeMap[match] || match;
-    });
-
-    const innerHtml = sanitizedLogoUrl
-        ? `<img src="${sanitizedLogoUrl}" class="w-8 h-8 object-contain rounded-full" onerror="this.style.display='none'" />`
+    const innerHtml = logoUrl 
+        ? `<img src="${logoUrl}" class="w-8 h-8 object-contain rounded-full" onerror="this.style.display='none'" />` 
         : `<span class="text-2xl">${iconContent}</span>`;
 
     return L.divIcon({
@@ -66,7 +53,7 @@ const createStyledIcon = (category: HotspotCategory | undefined, densityValue: n
         html: `
             <div class="relative flex items-center justify-center">
                 <div class="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md border border-white shadow-lg z-50">
-                    ${sanitizedBadgeText}
+                    ${badgeText}
                 </div>
                 <div class="w-12 h-12 rounded-full border-4 ${ringColor} ${bgColor} flex items-center justify-center backdrop-blur-sm overflow-hidden">
                     ${innerHtml}

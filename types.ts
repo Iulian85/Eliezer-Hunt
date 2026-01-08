@@ -81,24 +81,24 @@ export interface SpawnPoint {
 }
 
 export interface UserState {
-    balance: number;
-    tonBalance: number;
-    gameplayBalance: number;
-    rareBalance: number;
-    eventBalance: number;
-    dailySupplyBalance: number;
-    merchantBalance: number;
-    referralBalance: number;
+    balance: number; 
+    tonBalance: number; 
+    gameplayBalance: number; 
+    rareBalance: number; 
+    eventBalance: number; 
+    dailySupplyBalance: number; 
+    merchantBalance: number; 
+    referralBalance: number; 
     collectedIds: string[];
     location: Coordinate | null;
-    lastAdWatch: number;
-    lastDailyClaim: number;
+    lastAdWatch: number; 
+    lastDailyClaim: number; 
     adsWatched: number;
     sponsoredAdsWatched: number;
-    rareItemsCollected: number;
-    eventItemsCollected: number;
+    rareItemsCollected: number; 
+    eventItemsCollected: number; 
     referrals: number;
-    referralNames?: string[];
+    referralNames?: string[]; 
     hasClaimedReferral?: boolean;
     telegramId?: number;
     username?: string;
@@ -108,11 +108,9 @@ export interface UserState {
     photoUrl?: string;
     isBanned?: boolean;
     deviceFingerprint?: string;
-    biometricEnabled?: boolean;
+    biometricEnabled?: boolean; 
     lastInitData?: string; // SECURITY: Hash verification storage
     screenshotLock?: boolean;
-    adsgramBlockId?: string; // Adăugat pentru securitate
-    error?: string; // Added for error handling
 }
 
 export enum Tab {
@@ -145,14 +143,8 @@ export interface LeaderboardEntry {
 
 declare global {
     interface Window {
-        // Removed optionality to match global definitions and fix "All declarations of 'grecaptcha' must have identical modifiers" error
-        grecaptcha: any;
-        // Consolidating Adsgram declaration here to prevent conflicts in other files
-        Adsgram?: {
-            init: (params: { blockId: string }) => {
-                show: () => Promise<void>;
-            };
-        };
+        // FIX: Added optionality to grecaptcha to resolve "All declarations of 'grecaptcha' must have identical modifiers" error
+        grecaptcha?: any;
         Telegram?: {
             WebApp: {
                 ready: () => void;

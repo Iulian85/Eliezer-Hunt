@@ -7,6 +7,7 @@ import { Coin3D } from '../components/Coin3D';
 import { SpawnPoint } from '../types';
 import { showRewardedAd } from '../services/adsgram';
 import { UniversalVideoPlayer } from '../components/UniversalVideoPlayer';
+import { ADSGRAM_BLOCK_ID } from '../constants';
 
 // Cast components to any to avoid intrinsic element type errors
 const AmbientLight = 'ambientLight' as any;
@@ -17,7 +18,6 @@ interface ARViewProps {
     target: { spawn: SpawnPoint, dist: number } | null;
     onClose: () => void;
     onCollect: (points: number, tonReward?: number) => void;
-    adsgramBlockId: string; // Adăugat pentru securitate
 }
 
 const GyroCamera = () => <DeviceOrientationControls makeDefault alphaOffset={0} />;
@@ -42,7 +42,7 @@ const DriftingCoin = ({ coinRef, initialPos, onDistanceChange, onEscape, isPause
     return null;
 };
 
-export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect, adsgramBlockId }) => {
+export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const coinGroupRef = useRef<THREE.Group>(null);
     const [permissionError, setPermissionError] = useState(false);
@@ -173,7 +173,7 @@ export const ARView: React.FC<ARViewProps> = ({ target, onClose, onCollect, adsg
         if (isGB || isEvent || isLandmark) {
             setLoadingAd(true);
             try {
-                const success = await showRewardedAd(adsgramBlockId);
+                const success = await showRewardedAd(ADSGRAM_BLOCK_ID);
                 setLoadingAd(false);
                 if (success) {
                     if (isGB) finishGiftBox();

@@ -3,12 +3,12 @@ import React from 'react';
 import { Tab } from '../types';
 import { Map, Crosshair, Wallet, Trophy, Megaphone, ShieldCheck, Users } from 'lucide-react';
 import { clsx } from 'clsx';
+import { ADMIN_WALLET_ADDRESS } from '../constants';
 
 interface NavigationProps {
     currentTab: Tab;
     onTabChange: (tab: Tab) => void;
     userWalletAddress?: string;
-    userTelegramId?: string | number; // Adăugat pentru verificare admin
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ currentTab, onTabChange, userWalletAddress }) => {
@@ -24,8 +24,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onTabChange,
 
     const visibleItems = navItems.filter(item => {
         if (item.id === Tab.ADMIN) {
-            // Verificare server-side pentru admin
-            return false; // Va fi gestionat de server (verificat în AdminView)
+            return userWalletAddress && userWalletAddress === ADMIN_WALLET_ADDRESS;
         }
         return true;
     });

@@ -20,7 +20,6 @@ interface AdminViewProps {
     onResetMyAccount: () => void;
     isTestMode: boolean;
     onToggleTestMode: () => void;
-    userTelegramId: string | number; // Adăugat pentru verificare admin
 }
 
 const LocationPicker = ({ coords, onPick }: { coords: Coordinate, onPick: (c: Coordinate) => void }) => {
@@ -33,11 +32,10 @@ const LocationPicker = ({ coords, onPick }: { coords: Coordinate, onPick: (c: Co
 };
 
 export const AdminView: React.FC<AdminViewProps> = ({
-    allCampaigns, customHotspots, onSaveHotspots, onDeleteHotspot, onDeleteCampaign, onApprove, onReject, onResetMyAccount, isTestMode, onToggleTestMode, userTelegramId
+    allCampaigns, customHotspots, onSaveHotspots, onDeleteHotspot, onDeleteCampaign, onApprove, onReject, onResetMyAccount, isTestMode, onToggleTestMode
 }) => {
     const [tonConnectUI] = useTonConnectUI();
     const adminAddress = useTonAddress();
-    const [isAdmin, setIsAdmin] = useState(false); // Adăugat pentru verificare admin
     const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'ads' | 'hotspots' | 'giftboxes' | 'airdrop' | 'payments' | 'system'>('dashboard');
     const [users, setUsers] = useState<any[]>([]);
     const [withdrawals, setWithdrawals] = useState<any[]>([]);
@@ -47,22 +45,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const [isProcessingAirdrop, setIsProcessingAirdrop] = useState<string | null>(null);
     const [isExecutingPayment, setIsExecutingPayment] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Verificare admin la încărcare
-    useEffect(() => {
-        const checkAdmin = async () => {
-            try {
-                const response = await fetch('/api/is-admin', {
-                    headers: { 'x-user-id': userTelegramId.toString() }
-                });
-                const data = await response.json();
-                setIsAdmin(data.isAdmin);
-            } catch (error) {
-                console.error('Error checking admin status:', error);
-            }
-        };
-        checkAdmin();
-    }, [userTelegramId]);
 
     // Hotspot State
     const [hForm, setHForm] = useState<Partial<HotspotDefinition>>({

@@ -2,12 +2,17 @@
 import { SpawnPoint, Coordinate, HotspotDefinition } from './types';
 
 // =================CONFIG=================
-const getEnv = (key: string): string => {
-    // Vite caută automat în import.meta.env. Pentru fallback căutăm și varianta cu VITE_
-    const value = (import.meta.env as any)[key] || (import.meta.env as any)[`VITE_${key}`];
-    return value || '';
+const getEnv = (key: string) => {
+    try {
+        // @ts-ignore
+        return (import.meta.env && import.meta.env[key]) ? import.meta.env[key] : '';
+    } catch {
+        return '';
+    }
 };
 
+export const ADMIN_WALLET_ADDRESS = getEnv('VITE_ADMIN_WALLET_ADDRESS');
+export const ADSGRAM_BLOCK_ID = getEnv('VITE_ADSGRAM_BLOCK_ID');
 
 // ========================================
 // GLOBAL HOTSPOT REGISTRY

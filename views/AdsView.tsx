@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { Megaphone, MapPin, Video, Loader2, Clock, AlertCircle, Wallet, Image as ImageIcon, Calendar, Info, CheckCircle2, Search, Navigation, Building, ArrowRight, FlaskConical, Globe, Mail, Phone, Settings, BarChart3, TrendingUp, CreditCard, ChevronRight } from 'lucide-react';
 import { Coordinate, AdStatus, Campaign, ContactInfo } from '../types';
+import { ADMIN_WALLET_ADDRESS } from '../constants';
 
 interface AdsViewProps {
     userLocation: Coordinate | null;
@@ -152,36 +153,20 @@ export const AdsView: React.FC<AdsViewProps> = ({ userLocation, collectedIds, my
         setIsPaying(campaign.id);
         try {
             if (isTestMode) {
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                await new Promise(resolve => setTimeout(resolve, 1500)); 
                 onPayCampaign(campaign.id);
                 setIsPaying(null);
                 return;
             }
-            // Obține adresa admin de la server pentru securitate
-            const response = await fetch('/api/is-admin', {
-                headers: { 'x-user-id': 'admin-check' } // sau alt mecanism de autentificare
-            });
-            const { isAdmin } = await response.json();
-
-            if (!isAdmin) {
-                alert("Payment system unavailable.");
-                return;
-            }
-
-            const paymentResponse = await fetch('/api/processAdPayment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    campaignId: campaign.id,
-                    amount: campaign.totalPrice
-                })
-            });
-
-            if (paymentResponse.ok) {
-                onPayCampaign(campaign.id);
-            } else {
-                alert("Payment processing failed.");
-            }
+            const transaction = { 
+                validUntil: Math.floor(Date.now() / 1000) + 600, 
+                messages: [{ 
+                    address: ADMIN_WALLET_ADDRESS, 
+                    amount: (campaign.totalPrice * 1000000000).toString() 
+                }] 
+            };
+            await tonConnectUI.sendTransaction(transaction);
+            onPayCampaign(campaign.id);
         } catch (e) {
             alert("The payment was canceled or failed.");
         } finally {
