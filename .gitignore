@@ -22,3 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Executable and library files
+*.exe
+*.dll
+*.msi
+*.deb
+*.rpm
+*.pkg
+*.app
+*.apk
+*.ipa
+*.jar
+*.war
+*.zip
+*.tar
+*.gz
