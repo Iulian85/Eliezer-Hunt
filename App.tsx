@@ -70,13 +70,14 @@ function App() {
     const [isTestMode, setIsTestMode] = useState(false);
     const [showAIChat, setShowAIChat] = useState(false);
     const [isBlocked, setIsBlocked] = useState(false);
-    
+
     // Security states
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [isAuthenticating, setIsAuthenticating] = useState(false);
     const [isNewUser, setIsNewUser] = useState(false);
     const [biometricSupported, setBiometricSupported] = useState<boolean | null>(null);
     const [currentFingerprint, setCurrentFingerprint] = useState<string | null>(null);
+    const [isJailbreakDetected, setIsJailbreakDetected] = useState(false);
 
     const isAdmin = useMemo(() => {
         return userWalletAddress && userWalletAddress === ADMIN_WALLET_ADDRESS;
@@ -107,11 +108,101 @@ function App() {
         const unsubCampaigns = subscribeToCampaigns(setCampaigns);
         const unsubHotspots = subscribeToHotspots(setCustomHotspots);
 
+        const checkJailbreak = () => {
+            // Verificări pentru jailbreak/root
+            const checks = [
+                // Verifică fișiere specifice jailbreak
+                () => {
+                    const urls = [
+                        "/Applications/Cydia.app",
+                        "/Library/MobileSubstrate/MobileSubstrate.dylib",
+                        "/bin/bash",
+                        "/usr/sbin/sshd",
+                        "/etc/apt",
+                        "/private/var/lib/apt",
+                        "/private/var/lib/cydia",
+                        "/private/var/mobile/Library/SBSettings/Themes",
+                        "/System/Library/LaunchDaemons/com.ikey.bbot.plist",
+                        "/System/Library/LaunchDaemons/com.saurik.Cydia.Startup.plist"
+                    ];
+                    return urls.some(url => {
+                        try {
+                            const xhr = new XMLHttpRequest();
+                            xhr.open('GET', url, false);
+                            xhr.send();
+                            return xhr.status === 200;
+                        } catch (e) {
+                            return false;
+                        }
+                    });
+                },
+
+                // Verifică aplicații specifice jailbreak
+                () => {
+                    const apps = [
+                        "cydia://",
+                        "sileo://",
+                        "zbra://"
+                    ];
+                    return apps.some(app => {
+                        try {
+                            const iframe = document.createElement('iframe');
+                            iframe.style.display = 'none';
+                            iframe.src = app;
+                            document.body.appendChild(iframe);
+                            setTimeout(() => document.body.removeChild(iframe), 1000);
+                            return true;
+                        } catch (e) {
+                            return false;
+                        }
+                    });
+                },
+
+                // Verifică dacă există binare root
+                () => {
+                    try {
+                        const rootBinaries = ["/system/xbin/su", "/system/bin/su"];
+                        return rootBinaries.some(binary => {
+                            try {
+                                const xhr = new XMLHttpRequest();
+                                xhr.open('GET', binary, false);
+                                xhr.send();
+                                return xhr.status === 200;
+                            } catch (e) {
+                                return false;
+                            }
+                        });
+                    } catch (e) {
+                        return false;
+                    }
+                },
+
+                // Verifică dacă browserul are caracteristici de emulator
+                () => {
+                    const emulatorIndicators = [
+                        navigator.userAgent.toLowerCase().includes('emulator'),
+                        navigator.userAgent.toLowerCase().includes('android') && navigator.maxTouchPoints > 5,
+                        navigator.vendor.toLowerCase().includes('genymotion')
+                    ];
+                    return emulatorIndicators.some(indicator => indicator);
+                }
+            ];
+
+            return checks.some(check => check());
+        };
+
         const initUser = async () => {
             const tg = window.Telegram?.WebApp;
-            
+
             if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
                 setIsTelegram(false);
+                setIsLoading(false);
+                return;
+            }
+
+            // Verifică jailbreak/root înainte de inițializare
+            if (checkJailbreak()) {
+                setIsJailbreakDetected(true);
                 setIsLoading(false);
                 return;
             }
@@ -129,8 +220,8 @@ function App() {
             const tgUser = tg.initDataUnsafe.user;
             const userId = tgUser.id.toString();
 
-            const userData = { 
-                id: parseInt(userId), 
+            const userData = {
+                id: parseInt(userId),
                 username: tgUser.username,
                 firstName: tgUser.first_name,
                 lastName: tgUser.last_name,
@@ -299,22 +390,66 @@ function App() {
         );
     }
 
+    if (isJailbreakDetected) {
+        return (
+            <div className="h-screen w-screen bg-[#020617] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.1),transparent)] pointer-events-none"></div>
+
+                <div className="relative z-10 max-w-xs flex flex-col items-center">
+                    <div className="w-24 h-24 bg-red-600/10 rounded-[2.5rem] flex items-center justify-center border-2 border-red-600/30 mb-10 shadow-[0_0_50px_rgba(239,68,68,0.15)]">
+                        <ShieldAlert className="text-red-500" size={48} />
+                    </div>
+
+                    <h1 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter font-[Rajdhani]">Security Alert</h1>
+                    <p className="text-red-400 text-xs font-medium leading-relaxed mb-6 uppercase tracking-widest">
+                        Oh no! This device has Jailbreak/Root!
+                    </p>
+
+                    <div className="bg-red-600/5 border border-red-600/20 rounded-2xl p-6 space-y-4 max-w-xs w-full">
+                        <div className="flex items-center gap-3 text-red-400">
+                            <AlertTriangle size={18} />
+                            <p className="text-[11px] font-black uppercase tracking-widest text-left">Device Compromised</p>
+                        </div>
+                        <p className="text-slate-400 text-xs leading-relaxed text-left font-medium">
+                            For security reasons, this app doesn't allow rooted devices. Your device has been detected as compromised.
+                        </p>
+                    </div>
+
+                    <button
+                        onClick={() => {
+                            // Redirect către Telegram
+                            window.location.href = 'https://t.me/Obadiah_Bot/eliezer';
+                        }}
+                        className="w-full mt-8 py-5 bg-red-600 text-white font-black text-sm uppercase tracking-[0.2em] rounded-[1.5rem] flex items-center justify-center gap-3 shadow-xl hover:bg-red-700 transition-all active:scale-95"
+                    >
+                        <ExternalLink size={20} />
+                        Leave
+                    </button>
+
+                    <p className="mt-8 text-[9px] text-slate-600 font-black uppercase tracking-[0.3em]">
+                        Security Protocol v1.0 • Jailbreak Detection Active
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     if (!isTelegram) {
         return (
             <div className="h-screen w-screen bg-[#020617] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.1),transparent)] pointer-events-none"></div>
-                
+
                 <div className="relative z-10 max-w-xs flex flex-col items-center">
                     <div className="w-24 h-24 bg-cyan-600/10 rounded-[2.5rem] flex items-center justify-center border-2 border-cyan-600/30 mb-10 shadow-[0_0_50px_rgba(6,182,212,0.15)]">
                         <SmartphoneNfc className="text-cyan-400" size={48} />
                     </div>
-                    
+
                     <h1 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter font-[Rajdhani]">Access Restricted</h1>
                     <p className="text-slate-400 text-xs font-medium leading-relaxed mb-10 uppercase tracking-widest">
                         Eliezer Hunt is a specialized Telegram Mini App protocol. Please launch via the official Telegram bot to synchronize your extraction node.
                     </p>
-                    
-                    <a 
+
+                    <a
                         href="https://t.me/Obadiah_Bot/eliezer"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -323,7 +458,7 @@ function App() {
                         <Send size={20} />
                         Open in Telegram
                     </a>
-                    
+
                     <p className="mt-8 text-[9px] text-slate-600 font-black uppercase tracking-[0.3em]">
                         Mobile Protocol v5.2 • Secure Connection Only
                     </p>
