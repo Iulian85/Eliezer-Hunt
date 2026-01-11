@@ -1,0 +1,23 @@
+{
+  "build": {
+    "builder": "heroku/buildpacks:20"
+  },
+  "deploy": {
+    "startCommand": "node server.js"
+  },
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production",
+      "required": true
+    },
+    "TELEGRAM_BOT_TOKEN": {
+      "description": "Your Telegram bot token",
+      "required": true
+    },
+    "HMAC_SECRET": {
+      "description": "Secret key for HMAC verification",
+      "required": true
+    }
+  }
+}

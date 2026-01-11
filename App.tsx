@@ -128,31 +128,35 @@ function App() {
 
             try {
                 // Call backend to check security verification status
-                // For local testing without cloud functions, use mock implementation
-                // In a real implementation, this would call your backend endpoint
-                const isVerified = localStorage.getItem(`security_verified_${userId}`) === 'true';
+                // Determine if we're in local development or production
+                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-                // Simulate API response
-                const response = {
-                    json: async () => ({
-                        verified: isVerified,
-                        timestamp: Date.now()
-                    })
-                };
+                let response;
 
-                // Uncomment below for real backend implementation:
-                /*
-                const response = await fetch('http://localhost:5001/checkSecurityVerification', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        telegramUserId: userId,
-                        initData: window.Telegram?.WebApp?.initData || '' // Pass Telegram initData for verification
-                    })
-                });
-                */
+                if (isLocalhost) {
+                    // For local testing without cloud functions, use mock implementation
+                    const isVerified = localStorage.getItem(`security_verified_${userId}`) === 'true';
+
+                    // Simulate API response
+                    response = {
+                        json: async () => ({
+                            verified: isVerified,
+                            timestamp: Date.now()
+                        })
+                    };
+                } else {
+                    // For production, call the actual backend
+                    response = await fetch('/checkSecurityVerification', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            telegramUserId: userId,
+                            initData: window.Telegram?.WebApp?.initData || '' // Pass Telegram initData for verification
+                        })
+                    });
+                }
 
                 const data = await response.json();
 
@@ -381,41 +385,44 @@ function App() {
 
                     <button
                         onClick={() => {
-                            // For local testing, we'll simulate the security verification
-                            // In a real implementation, this would link to your native security scanner app
-                            const tg = window.Telegram?.WebApp;
-                            const userId = tg?.initDataUnsafe?.user?.id?.toString() || '';
+                            // Determine if we're in local development or production
+                            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-                            // Simulate successful security verification for local testing
-                            localStorage.setItem(`security_verified_${userId}`, 'true');
+                            if (isLocalhost) {
+                                // For local testing, simulate the security verification
+                                const tg = window.Telegram?.WebApp;
+                                const userId = tg?.initDataUnsafe?.user?.id?.toString() || '';
 
-                            // Reload the app to reflect the change
-                            window.location.reload();
+                                // Simulate successful security verification for local testing
+                                localStorage.setItem(`security_verified_${userId}`, 'true');
 
-                            // For real implementation, uncomment the code below:
-                            /*
-                            const initData = tg?.initData || '';
-
-                            // Construct deep link with Telegram initData for verification
-                            const userAgent = navigator.userAgent.toLowerCase();
-                            if (userAgent.includes('android')) {
-                                // Pass initData to the native app for verification
-                                const deepLink = `eliezer-hunt-security://scan?initData=${encodeURIComponent(initData)}&userId=${tg?.initDataUnsafe?.user?.id || ''}`;
-                                window.location.href = deepLink;
-                            } else if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
-                                // Pass initData to the native app for verification
-                                const deepLink = `eliezer-hunt-security://scan?initData=${encodeURIComponent(initData)}&userId=${tg?.initDataUnsafe?.user?.id || ''}`;
-                                window.location.href = deepLink;
+                                // Reload the app to reflect the change
+                                window.location.reload();
                             } else {
-                                // Fallback for other platforms
-                                alert('Please download the Eliezer Hunt Security Scanner from your device\'s app store');
+                                // For production, link to native security scanner app
+                                const tg = window.Telegram?.WebApp;
+                                const initData = tg?.initData || '';
+
+                                // Construct deep link with Telegram initData for verification
+                                const userAgent = navigator.userAgent.toLowerCase();
+                                if (userAgent.includes('android')) {
+                                    // Pass initData to the native app for verification
+                                    const deepLink = `eliezer-hunt-security://scan?initData=${encodeURIComponent(initData)}&userId=${tg?.initDataUnsafe?.user?.id || ''}`;
+                                    window.location.href = deepLink;
+                                } else if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
+                                    // Pass initData to the native app for verification
+                                    const deepLink = `eliezer-hunt-security://scan?initData=${encodeURIComponent(initData)}&userId=${tg?.initDataUnsafe?.user?.id || ''}`;
+                                    window.location.href = deepLink;
+                                } else {
+                                    // Fallback for other platforms
+                                    alert('Please download the Eliezer Hunt Security Scanner from your device\'s app store');
+                                }
                             }
-                            */
                         }}
                         className="w-full mt-8 py-5 bg-red-600 text-white font-black text-sm uppercase tracking-[0.2em] rounded-[1.5rem] flex items-center justify-center gap-3 shadow-xl hover:bg-red-700 transition-all active:scale-95"
                     >
                         <ExternalLink size={20} />
-                        Verify Device Security
+                        {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Verify Device Security (Local)' : 'Download Security App'}
                     </button>
 
                     <p className="mt-8 text-[9px] text-slate-600 font-black uppercase tracking-[0.3em]">
