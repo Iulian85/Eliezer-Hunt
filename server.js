@@ -10,11 +10,34 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from dist directory first (where build files are)
-app.use(express.static('dist'));
+// Serve static files with proper headers for ES modules
+app.use('/dist', express.static('dist', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (filePath.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    } else if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
-// Then serve files from root directory
-app.use(express.static('.'));
+app.use(express.static('.', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (filePath.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    } else if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 // API routes for security verification
 const securityVerifications = {};
