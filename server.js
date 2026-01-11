@@ -50,6 +50,16 @@ app.get('/dist/:filename', (req, res) => {
   });
 });
 
+// Specific route for index.tsx (serving it as JavaScript)
+app.get('/index.tsx', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.tsx'), { headers: { 'Content-Type': 'application/javascript' } });
+});
+
+// Specific route for src/index.css
+app.get('/src/index.css', (req, res) => {
+  res.sendFile(path.join(__dirname, 'src', 'index.css'), { headers: { 'Content-Type': 'text/css' } });
+});
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
