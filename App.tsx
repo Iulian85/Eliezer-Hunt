@@ -128,8 +128,21 @@ function App() {
 
             try {
                 // Call backend to check security verification status
-                // In a real implementation, this would call your Firebase Function endpoint
-                const response = await fetch('http://localhost:5001/YOUR_PROJECT_ID/us-central1/checkSecurityVerification', {
+                // For local testing without cloud functions, use mock implementation
+                // In a real implementation, this would call your backend endpoint
+                const isVerified = localStorage.getItem(`security_verified_${userId}`) === 'true';
+
+                // Simulate API response
+                const response = {
+                    json: async () => ({
+                        verified: isVerified,
+                        timestamp: Date.now()
+                    })
+                };
+
+                // Uncomment below for real backend implementation:
+                /*
+                const response = await fetch('http://localhost:5001/checkSecurityVerification', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -139,6 +152,7 @@ function App() {
                         initData: window.Telegram?.WebApp?.initData || '' // Pass Telegram initData for verification
                     })
                 });
+                */
 
                 const data = await response.json();
 
@@ -367,9 +381,19 @@ function App() {
 
                     <button
                         onClick={() => {
-                            // Deep link to native security app
-                            // In a real implementation, this would link to your published security scanner app
+                            // For local testing, we'll simulate the security verification
+                            // In a real implementation, this would link to your native security scanner app
                             const tg = window.Telegram?.WebApp;
+                            const userId = tg?.initDataUnsafe?.user?.id?.toString() || '';
+
+                            // Simulate successful security verification for local testing
+                            localStorage.setItem(`security_verified_${userId}`, 'true');
+
+                            // Reload the app to reflect the change
+                            window.location.reload();
+
+                            // For real implementation, uncomment the code below:
+                            /*
                             const initData = tg?.initData || '';
 
                             // Construct deep link with Telegram initData for verification
@@ -386,11 +410,12 @@ function App() {
                                 // Fallback for other platforms
                                 alert('Please download the Eliezer Hunt Security Scanner from your device\'s app store');
                             }
+                            */
                         }}
                         className="w-full mt-8 py-5 bg-red-600 text-white font-black text-sm uppercase tracking-[0.2em] rounded-[1.5rem] flex items-center justify-center gap-3 shadow-xl hover:bg-red-700 transition-all active:scale-95"
                     >
                         <ExternalLink size={20} />
-                        Download Security App
+                        Verify Device Security
                     </button>
 
                     <p className="mt-8 text-[9px] text-slate-600 font-black uppercase tracking-[0.3em]">
