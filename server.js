@@ -55,10 +55,25 @@ app.get('/index.tsx', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.tsx'), { headers: { 'Content-Type': 'application/javascript' } });
 });
 
-// Specific route for src/index.css
-app.get('/src/index.css', (req, res) => {
-  res.sendFile(path.join(__dirname, 'src', 'index.css'), { headers: { 'Content-Type': 'text/css' } });
+// Specific routes for index.css (both root and src locations)
+app.get('/index.css', (req, res) => {
+  // Try to serve from src directory first, then root
+  const fs = require('fs');
+  const cssPath = path.join(__dirname, 'src', 'index.css');
+
+  if (fs.existsSync(cssPath)) {
+    res.sendFile(cssPath, { headers: { 'Content-Type': 'text/css' } });
+  } else {
+    // If not in src, try root directory
+    const rootCssPath = path.join(__dirname, 'index.css');
+    if (fs.existsSync(rootCssPath)) {
+      res.sendFile(rootCssPath, { headers: { 'Content-Type': 'text/css' } });
+    } else {
+      res.status(404).send('CSS file not found');
+    }
+  }
 });
+
 
 // Health check endpoint
 app.get('/', (req, res) => {
