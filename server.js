@@ -47,6 +47,23 @@ app.get('/dist/main.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist/main.js'), { headers: { 'Content-Type': 'application/javascript' } });
 });
 
+// Specific route for index.css
+app.get('/index.css', (req, res) => {
+  res.sendFile(path.join(__dirname, 'src/index.css'), { headers: { 'Content-Type': 'text/css' } });
+});
+
+// Specific route for any file in dist directory
+app.get('/dist/:filename', (req, res) => {
+  const filename = req.params.filename;
+  res.sendFile(path.join(__dirname, 'dist', filename), {
+    headers: {
+      'Content-Type': filename.endsWith('.js') ? 'application/javascript' :
+                     filename.endsWith('.css') ? 'text/css' :
+                     filename.endsWith('.json') ? 'application/json' : 'application/octet-stream'
+    }
+  });
+});
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -96,6 +113,7 @@ app.post('/registerSecurityVerification', async (req, res) => {
 });
 
 // Handle client-side routing - serve index.html for all non-API and non-file routes
+// NOTE: This must be placed AFTER all specific routes
 app.get('*', (req, res) => {
   // Don't interfere with API routes
   if (req.path.startsWith('/checkSecurityVerification') || req.path.startsWith('/registerSecurityVerification')) {
