@@ -6,8 +6,12 @@
         "setup": {
           "nixPkgs": ["nodejs-20_x", "npm"]
         },
-        "install": "npm ci",
-        "start": "npm start"
+        "install": {
+          "cmds": ["npm ci"]
+        },
+        "start": {
+          "cmd": "npm start"
+        }
       }
     }
   },
