@@ -1,7 +1,4 @@
 {
-  "build": {
-    "builder": "heroku/buildpacks:20"
-  },
   "deploy": {
     "startCommand": "node server.js"
   },
