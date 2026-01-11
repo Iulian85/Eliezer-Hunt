@@ -42,6 +42,11 @@ app.use(express.static('.', {
 // API routes for security verification
 const securityVerifications = {};
 
+// Specific route for the main JavaScript bundle
+app.get('/dist/main.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist/main.js'), { headers: { 'Content-Type': 'application/javascript' } });
+});
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -96,14 +101,14 @@ app.get('*', (req, res) => {
   if (req.path.startsWith('/checkSecurityVerification') || req.path.startsWith('/registerSecurityVerification')) {
     res.status(404).json({ error: 'API route not found' });
   } else {
-    // Check if the request is for a file (has an extension)
+    // Check if the request is for a file (has an extension like .js, .css, .json, etc.)
     const pathExt = path.extname(req.path);
-    if (pathExt) {
+    if (pathExt && pathExt !== '.html') {
       // This is a file request, let static middleware handle it
       // This shouldn't reach here if static middleware worked, but just in case
       res.status(404).send('File not found');
     } else {
-      // This is a client-side route, serve the main app
+      // This is a client-side route or HTML request, serve the main app
       res.sendFile(path.join(__dirname, 'index.html'), { headers: { 'Content-Type': 'text/html' } });
     }
   }
