@@ -8,12 +8,28 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*', // Allow all origins during development
+  credentials: true
+}));
 app.use(express.json());
 
-// Serve static files - first try dist folder (for production builds), then current directory
-app.use(express.static('dist'));
-app.use(express.static('.'));
+// Serve static files with proper headers for ES modules
+app.use(express.static('.', {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js') || path.endsWith('.ts') || path.endsWith('.jsx') || path.endsWith('.tsx')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    }
+  }
+}));
+
+// Special handling for index.html to ensure it's served for client-side routing
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'), { headers: { 'Content-Type': 'text/html' } });
+});
 
 // Mock database (in production, use a real database like Redis or PostgreSQL)
 const securityVerifications = {};
