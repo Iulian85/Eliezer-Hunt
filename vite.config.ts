@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './', // Corect, previne rutele absolute greșite
+  base: './',
   define: {
     global: 'globalThis',
   },
@@ -23,8 +24,8 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     minify: 'terser',
-    target: 'es2022',
-    modulePreload: false, // OPREȘTE importmap/preload
+    target: 'es2020',
+    modulePreload: false,
     terserOptions: {
       compress: {
         drop_console: true,
@@ -40,14 +41,12 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        // Această setare forțează tot codul în bundle-uri JS clasice
         entryFileNames: 'assets/core-[hash].js',
         chunkFileNames: 'assets/vendor-[hash].js',
         assetFileNames: 'assets/[hash].[ext]',
       },
     },
   },
-  // ADAUGĂ ASTA: Forțează pre-procesarea librăriilor mari pentru a evita importurile externe
   optimizeDeps: {
     include: ['react', 'react-dom', 'firebase/app', 'firebase/firestore', 'lucide-react']
   }

@@ -1,6 +1,6 @@
 {
   "deploy": {
-    "startCommand": "node server.js"
+    "startCommand": "npm start"
   },
   "env": {
     "NODE_ENV": {
