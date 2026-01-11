@@ -14,16 +14,34 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Special middleware to handle .tsx and .ts files by serving them as JavaScript
+// Special middleware to handle .tsx and .ts files by transpiling them to JavaScript
 app.use((req, res, next) => {
   if (req.path.endsWith('.tsx') || req.path.endsWith('.ts')) {
     const fs = require('fs');
-    const filePath = path.join(__dirname, req.path);
+    const pathModule = require('path');
+    const babel = require('@babel/core');
+
+    const filePath = pathModule.join(__dirname, req.path);
 
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, 'utf8');
-      res.setHeader('Content-Type', 'application/javascript');
-      res.send(content);
+
+      try {
+        // Transpile TypeScript/JSX to JavaScript
+        const result = babel.transformSync(content, {
+          presets: [
+            ['@babel/preset-react', { runtime: 'automatic' }],
+            '@babel/preset-typescript'
+          ],
+          filename: req.path
+        });
+
+        res.setHeader('Content-Type', 'application/javascript');
+        res.send(result.code);
+      } catch (error) {
+        console.error('Transpilation error:', error);
+        res.status(500).send(`Transpilation error: ${error.message}`);
+      }
     } else {
       next();
     }

@@ -16,6 +16,11 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
+    "@swc/cli": "^0.7.9",
+    "@swc/core": "^1.15.8",
     "@vitejs/plugin-react": "^5.1.2",
     "nodemon": "^2.0.22",
     "vite": "^7.3.1"
