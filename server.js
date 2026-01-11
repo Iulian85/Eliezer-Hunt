@@ -25,20 +25,6 @@ app.use('/dist', express.static('dist', {
   }
 }));
 
-app.use(express.static('.', {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    } else if (filePath.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css');
-    } else if (filePath.endsWith('.json')) {
-      res.setHeader('Content-Type', 'application/json');
-    } else if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    }
-  }
-}));
-
 // API routes for security verification
 const securityVerifications = {};
 
