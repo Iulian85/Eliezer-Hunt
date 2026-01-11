@@ -14,10 +14,28 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Special middleware to handle .tsx and .ts files by serving them as JavaScript
+app.use((req, res, next) => {
+  if (req.path.endsWith('.tsx') || req.path.endsWith('.ts')) {
+    const fs = require('fs');
+    const filePath = path.join(__dirname, req.path);
+
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      res.setHeader('Content-Type', 'application/javascript');
+      res.send(content);
+    } else {
+      next();
+    }
+  } else {
+    next();
+  }
+});
+
 // Serve static files with proper headers for ES modules
 app.use(express.static('.', {
   setHeaders: (res, path) => {
-    if (path.endsWith('.js') || path.endsWith('.ts') || path.endsWith('.jsx') || path.endsWith('.tsx')) {
+    if (path.endsWith('.js') || path.endsWith('.jsx')) {
       res.setHeader('Content-Type', 'application/javascript');
     }
     if (path.endsWith('.css')) {
