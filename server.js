@@ -90,13 +90,22 @@ app.post('/registerSecurityVerification', async (req, res) => {
   }
 });
 
-// Handle client-side routing - serve index.html for all non-API routes
+// Handle client-side routing - serve index.html for all non-API and non-file routes
 app.get('*', (req, res) => {
   // Don't interfere with API routes
   if (req.path.startsWith('/checkSecurityVerification') || req.path.startsWith('/registerSecurityVerification')) {
     res.status(404).json({ error: 'API route not found' });
   } else {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    // Check if the request is for a file (has an extension)
+    const pathExt = path.extname(req.path);
+    if (pathExt) {
+      // This is a file request, let static middleware handle it
+      // This shouldn't reach here if static middleware worked, but just in case
+      res.status(404).send('File not found');
+    } else {
+      // This is a client-side route, serve the main app
+      res.sendFile(path.join(__dirname, 'index.html'), { headers: { 'Content-Type': 'text/html' } });
+    }
   }
 });
 
