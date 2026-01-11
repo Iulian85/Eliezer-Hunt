@@ -7,16 +7,18 @@ const app = express();
 // Use the port provided by Railway or default to 3000
 const PORT = process.env.PORT || 3000;
 
-// Serve static files from the dist directory (where your React app builds to)
-// Or from the current directory if in development
-app.use(express.static('.'));
-
 // Middleware
 app.use(cors());
 app.use(express.json());
 
+// Serve static files - first try dist folder (for production builds), then current directory
+app.use(express.static('dist'));
+app.use(express.static('.'));
+
 // Mock database (in production, use a real database like Redis or PostgreSQL)
 const securityVerifications = {};
+
+// Handle API routes first (before serving static files)
 
 /**
  * Verifies Telegram WebApp initData to ensure the request is legitimate
@@ -248,9 +250,30 @@ app.post('/registerSecurityVerification', async (req, res) => {
   }
 });
 
-// Serve the main app for all other routes
-app.get('*', (req, res) => {
+// Serve the main app for all non-API routes
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Handle API routes specifically
+app.get('/checkSecurityVerification', (req, res) => {
+  res.status(405).json({ error: 'Method not allowed. Use POST.' });
+});
+
+app.get('/registerSecurityVerification', (req, res) => {
+  res.status(405).json({ error: 'Method not allowed. Use POST.' });
+});
+
+// For any other non-API routes, serve the main app
+app.get('*', (req, res) => {
+  // Check if it's an API route
+  if (req.path.startsWith('/checkSecurityVerification') || req.path.startsWith('/registerSecurityVerification')) {
+    // This will be handled by the POST routes below
+    res.status(404).json({ error: 'Method not allowed for GET. Use POST.' });
+  } else {
+    // Serve the main app
+    res.sendFile(path.join(__dirname, 'index.html'));
+  }
 });
 
 app.listen(PORT, () => {

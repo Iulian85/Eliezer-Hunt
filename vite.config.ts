@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   base: './', // Corect, previne rutele absolute greșite
   define: {
-    'process.env': process.env,
+    global: 'globalThis',
   },
   server: {
     host: true,
@@ -23,7 +23,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     minify: 'terser',
-    target: 'es2022', 
+    target: 'es2022',
     modulePreload: false, // OPREȘTE importmap/preload
     terserOptions: {
       compress: {
