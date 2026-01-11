@@ -6,20 +6,24 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.18",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "tailwind": "^2.3.1",
-    "tailwindcss": "^4.1.18"
+    "tailwind": "^2.3.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "@vitejs/plugin-react": "^5.1.2",
+    "autoprefixer": "^10.4.23",
+    "nodemon": "^3.1.11",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18"
   },
   "engines": {
     "node": ">=18"

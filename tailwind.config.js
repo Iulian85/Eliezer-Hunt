@@ -1,19 +1,16 @@
-/** @type {import('tailwindcss').Config} */  
-export default {  
-  content: [  
-    "./index.html",  
-    "./src/**/*.{js,ts,jsx,tsx}",  
-    "./components/**/*.{js,ts,jsx,tsx}",  
-    "./views/**/*.{js,ts,jsx,tsx}",  
-    "./App.tsx",  
-    "./**/*.{js,ts,jsx,tsx}"  
-  ],  
-  theme: {  
-    extend: {  
-      fontFamily: {  
-        rajdhani: ['Rajdhani', 'sans-serif'],  
-      },  
-    },  
-  },  
-  plugins: [],  
-} 
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+    "./App.tsx",
+    "./index.tsx",
+    "./components/**/*.{js,ts,jsx,tsx}",
+    "./views/**/*.{js,ts,jsx,tsx}",
+    "./pages/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
