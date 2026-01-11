@@ -51,21 +51,36 @@ app.use((req, res, next) => {
 });
 
 // Serve static files with proper headers for ES modules
-app.use(express.static('.', {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.js') || path.endsWith('.jsx')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    }
-    if (path.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css');
-    }
+app.use(express.static('dist'));  // Serve files from dist first
+app.use(express.static('.'));     // Then fallback to root directory
+
+// Set proper headers for JavaScript and CSS files
+app.use((req, res, next) => {
+  if (req.url.endsWith('.js')) {
+    res.setHeader('Content-Type', 'application/javascript');
+  } else if (req.url.endsWith('.css')) {
+    res.setHeader('Content-Type', 'text/css');
+  } else if (req.url.endsWith('.json')) {
+    res.setHeader('Content-Type', 'application/json');
   }
-}));
+  next();
+});
 
 // Special handling for index.html to ensure it's served for client-side routing
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'), { headers: { 'Content-Type': 'text/html' } });
 });
+
+// Handle other routes for client-side routing
+app.get('*', (req, res) => {
+  // Don't interfere with API routes
+  if (req.path.startsWith('/checkSecurityVerification') || req.path.startsWith('/registerSecurityVerification')) {
+    // These will be handled by the POST routes
+    res.status(404).json({ error: 'API route not found' });
+  } else {
+    // Serve the main app for all other routes (client-side routing)
+    res.sendFile(path.join(__dirname, 'index.html'), { headers: { 'Content-Type': 'text/html' } });
+  }
 
 // Mock database (in production, use a real database like Redis or PostgreSQL)
 const securityVerifications = {};
