@@ -14,57 +14,35 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Special middleware to handle .tsx and .ts files by transpiling them to JavaScript
-app.use((req, res, next) => {
-  if (req.path.endsWith('.tsx') || req.path.endsWith('.ts')) {
-    const fs = require('fs');
-    const pathModule = require('path');
-    const babel = require('@babel/core');
-
-    const filePath = pathModule.join(__dirname, req.path);
-
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, 'utf8');
-
-      try {
-        // Transpile TypeScript/JSX to JavaScript
-        const result = babel.transformSync(content, {
-          presets: [
-            ['@babel/preset-react', { runtime: 'automatic' }],
-            '@babel/preset-typescript'
-          ],
-          filename: req.path
-        });
-
-        res.setHeader('Content-Type', 'application/javascript');
-        res.send(result.code);
-      } catch (error) {
-        console.error('Transpilation error:', error);
-        res.status(500).send(`Transpilation error: ${error.message}`);
-      }
-    } else {
-      next();
-    }
-  } else {
-    next();
-  }
-});
+// Static file serving only - no dynamic transpilation
+// All files should be pre-built
 
 // Serve static files with proper headers for ES modules
-app.use(express.static('dist'));  // Serve files from dist first
-app.use(express.static('.'));     // Then fallback to root directory
-
-// Set proper headers for JavaScript and CSS files
-app.use((req, res, next) => {
-  if (req.url.endsWith('.js')) {
-    res.setHeader('Content-Type', 'application/javascript');
-  } else if (req.url.endsWith('.css')) {
-    res.setHeader('Content-Type', 'text/css');
-  } else if (req.url.endsWith('.json')) {
-    res.setHeader('Content-Type', 'application/json');
+app.use(express.static('dist', {
+  // Serve files from dist first
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    } else if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    }
   }
-  next();
-});
+}));
+
+app.use(express.static('.', {
+  // Then fallback to root directory
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    } else if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    }
+  }
+}));
 
 // Special handling for index.html to ensure it's served for client-side routing
 app.get('/', (req, res) => {
