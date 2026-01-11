@@ -1,10 +1,15 @@
 const express = require('express');
 const crypto = require('crypto');
 const cors = require('cors');
+const path = require('path');
 const app = express();
 
 // Use the port provided by Railway or default to 3000
 const PORT = process.env.PORT || 3000;
+
+// Serve static files from the dist directory (where your React app builds to)
+// Or from the current directory if in development
+app.use(express.static('.'));
 
 // Middleware
 app.use(cors());
@@ -243,15 +248,15 @@ app.post('/registerSecurityVerification', async (req, res) => {
   }
 });
 
-// Health check endpoint
-app.get('/', (req, res) => {
-  res.status(200).json({ status: 'Server is running', uptime: process.uptime() });
+// Serve the main app for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
   console.log(`Security server running on port ${PORT}`);
   console.log('Endpoints:');
-  console.log(`- GET http://localhost:${PORT}/ (health check)`);
+  console.log(`- GET http://localhost:${PORT}/ (serves main app)`);
   console.log(`- POST http://localhost:${PORT}/checkSecurityVerification`);
   console.log(`- POST http://localhost:${PORT}/registerSecurityVerification`);
 });
