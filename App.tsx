@@ -185,6 +185,37 @@ function App() {
                         navigator.vendor.toLowerCase().includes('genymotion')
                     ];
                     return emulatorIndicators.some(indicator => indicator);
+                },
+
+                // Verificare Samsung KNOX (doar pentru dispozitive Samsung)
+                () => {
+                    try {
+                        // Verifică dacă este un dispozitiv Samsung
+                        const isSamsung = navigator.userAgent.toLowerCase().includes('samsung');
+                        if (!isSamsung) return false;
+
+                        // Caută indicii ale modificărilor KNOX
+                        const knoxIndicators = [
+                            // Verifică dacă există indicii de modificare a securității
+                            typeof (window as any).knox !== 'undefined',
+                            typeof (window as any).samsung !== 'undefined',
+                            // Verifică dacă există aplicații de root management
+                            document.querySelectorAll('*').length > 10000 // Verificare generală pentru aplicații multiple
+                        ];
+
+                        // Verificare prin detectarea proprietăților de securitate KNOX
+                        try {
+                            const testProp = navigator.userAgent.includes('Knox') ||
+                                           (window as any).device && (window as any).device.manufacturer &&
+                                           (window as any).device.manufacturer.toLowerCase().includes('samsung') &&
+                                           (window as any).device.securityLevel;
+                            return testProp;
+                        } catch (e) {
+                            return false;
+                        }
+                    } catch (e) {
+                        return false;
+                    }
                 }
             ];
 
