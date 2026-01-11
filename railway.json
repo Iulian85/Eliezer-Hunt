@@ -1,6 +1,15 @@
 {
-  "deploy": {
-    "startCommand": "npm start"
+  "build": {
+    "builder": "NIXPACKS",
+    "nixpacksPlan": {
+      "phases": {
+        "setup": {
+          "nixPkgs": ["nodejs-20_x", "npm"]
+        },
+        "install": "npm ci",
+        "start": "npm start"
+      }
+    }
   },
   "env": {
     "NODE_ENV": {
