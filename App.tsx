@@ -70,15 +70,13 @@ function App() {
     const [isTestMode, setIsTestMode] = useState(false);
     const [showAIChat, setShowAIChat] = useState(false);
     const [isBlocked, setIsBlocked] = useState(false);
-
+    
     // Security states
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [isAuthenticating, setIsAuthenticating] = useState(false);
     const [isNewUser, setIsNewUser] = useState(false);
     const [biometricSupported, setBiometricSupported] = useState<boolean | null>(null);
     const [currentFingerprint, setCurrentFingerprint] = useState<string | null>(null);
-    const [isSecurityVerified, setIsSecurityVerified] = useState<boolean | null>(null);
-    const [checkingSecurity, setCheckingSecurity] = useState(true);
 
     const isAdmin = useMemo(() => {
         return userWalletAddress && userWalletAddress === ADMIN_WALLET_ADDRESS;
@@ -109,9 +107,9 @@ function App() {
         const unsubCampaigns = subscribeToCampaigns(setCampaigns);
         const unsubHotspots = subscribeToHotspots(setCustomHotspots);
 
-        const checkSecurityVerification = async () => {
+        const initUser = async () => {
             const tg = window.Telegram?.WebApp;
-
+            
             if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
                 setIsTelegram(false);
                 setIsLoading(false);
@@ -122,65 +120,17 @@ function App() {
             tg.expand();
             setIsTelegram(true);
 
-            // Check if user has completed native security scan
-            const tgUser = tg.initDataUnsafe.user;
-            const userId = tgUser.id.toString();
-
-            try {
-                // Call backend to check security verification status
-                // Determine if we're in local development or production
-                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-                let response;
-
-                if (isLocalhost) {
-                    // For local testing without cloud functions, use mock implementation
-                    const isVerified = localStorage.getItem(`security_verified_${userId}`) === 'true';
-
-                    // Simulate API response
-                    response = {
-                        json: async () => ({
-                            verified: isVerified,
-                            timestamp: Date.now()
-                        })
-                    };
-                } else {
-                    // For production, call the actual backend
-                    response = await fetch('/checkSecurityVerification', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            telegramUserId: userId,
-                            initData: window.Telegram?.WebApp?.initData || '' // Pass Telegram initData for verification
-                        })
-                    });
-                }
-
-                const data = await response.json();
-
-                if (data.verified) {
-                    setIsSecurityVerified(true);
-                } else {
-                    setIsSecurityVerified(false);
-                }
-            } catch (error) {
-                console.error('Security verification check failed:', error);
-                // Default to requiring verification if backend is unreachable
-                setIsSecurityVerified(false);
-            } finally {
-                setCheckingSecurity(false);
-            }
-
             if (tg.BiometricManager) {
                 tg.BiometricManager.init(() => {
                     setBiometricSupported(tg.BiometricManager.available);
                 });
             }
 
-            const userData = {
-                id: parseInt(userId),
+            const tgUser = tg.initDataUnsafe.user;
+            const userId = tgUser.id.toString();
+
+            const userData = { 
+                id: parseInt(userId), 
                 username: tgUser.username,
                 firstName: tgUser.first_name,
                 lastName: tgUser.last_name,
@@ -234,7 +184,7 @@ function App() {
             }
         };
 
-        checkSecurityVerification();
+        initUser();
         return () => { unsubCampaigns(); unsubHotspots(); };
     }, []);
 
@@ -349,106 +299,22 @@ function App() {
         );
     }
 
-    if (checkingSecurity) {
-        return (
-            <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center text-white font-mono">
-                <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="animate-pulse tracking-tighter uppercase text-xs">Security Verification...</p>
-            </div>
-        );
-    }
-
-    if (isSecurityVerified === false) {
-        return (
-            <div className="h-screen w-screen bg-[#020617] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.1),transparent)] pointer-events-none"></div>
-
-                <div className="relative z-10 max-w-xs flex flex-col items-center">
-                    <div className="w-24 h-24 bg-red-600/10 rounded-[2.5rem] flex items-center justify-center border-2 border-red-600/30 mb-10 shadow-[0_0_50px_rgba(239,68,68,0.15)]">
-                        <ShieldAlert className="text-red-500" size={48} />
-                    </div>
-
-                    <h1 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter font-[Rajdhani]">Security Scan Required</h1>
-                    <p className="text-red-400 text-xs font-medium leading-relaxed mb-6 uppercase tracking-widest">
-                        Native Security App Required
-                    </p>
-
-                    <div className="bg-red-600/5 border border-red-600/20 rounded-2xl p-6 space-y-4 max-w-xs w-full">
-                        <div className="flex items-center gap-3 text-red-400">
-                            <AlertTriangle size={18} />
-                            <p className="text-[11px] font-black uppercase tracking-widest text-left">Device Verification Needed</p>
-                        </div>
-                        <p className="text-slate-400 text-xs leading-relaxed text-left font-medium">
-                            Please download and run the native security scanner app to verify your device integrity before accessing Eliezer Hunt.
-                        </p>
-                    </div>
-
-                    <button
-                        onClick={() => {
-                            // Determine if we're in local development or production
-                            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-                            if (isLocalhost) {
-                                // For local testing, simulate the security verification
-                                const tg = window.Telegram?.WebApp;
-                                const userId = tg?.initDataUnsafe?.user?.id?.toString() || '';
-
-                                // Simulate successful security verification for local testing
-                                localStorage.setItem(`security_verified_${userId}`, 'true');
-
-                                // Reload the app to reflect the change
-                                window.location.reload();
-                            } else {
-                                // For production, link to native security scanner app
-                                const tg = window.Telegram?.WebApp;
-                                const initData = tg?.initData || '';
-
-                                // Construct deep link with Telegram initData for verification
-                                const userAgent = navigator.userAgent.toLowerCase();
-                                if (userAgent.includes('android')) {
-                                    // Pass initData to the native app for verification
-                                    const deepLink = `eliezer-hunt-security://scan?initData=${encodeURIComponent(initData)}&userId=${tg?.initDataUnsafe?.user?.id || ''}`;
-                                    window.location.href = deepLink;
-                                } else if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
-                                    // Pass initData to the native app for verification
-                                    const deepLink = `eliezer-hunt-security://scan?initData=${encodeURIComponent(initData)}&userId=${tg?.initDataUnsafe?.user?.id || ''}`;
-                                    window.location.href = deepLink;
-                                } else {
-                                    // Fallback for other platforms
-                                    alert('Please download the Eliezer Hunt Security Scanner from your device\'s app store');
-                                }
-                            }
-                        }}
-                        className="w-full mt-8 py-5 bg-red-600 text-white font-black text-sm uppercase tracking-[0.2em] rounded-[1.5rem] flex items-center justify-center gap-3 shadow-xl hover:bg-red-700 transition-all active:scale-95"
-                    >
-                        <ExternalLink size={20} />
-                        {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Verify Device Security (Local)' : 'Download Security App'}
-                    </button>
-
-                    <p className="mt-8 text-[9px] text-slate-600 font-black uppercase tracking-[0.3em]">
-                        Security Protocol v2.0 • Native Verification Required
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
     if (!isTelegram) {
         return (
             <div className="h-screen w-screen bg-[#020617] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.1),transparent)] pointer-events-none"></div>
-
+                
                 <div className="relative z-10 max-w-xs flex flex-col items-center">
                     <div className="w-24 h-24 bg-cyan-600/10 rounded-[2.5rem] flex items-center justify-center border-2 border-cyan-600/30 mb-10 shadow-[0_0_50px_rgba(6,182,212,0.15)]">
                         <SmartphoneNfc className="text-cyan-400" size={48} />
                     </div>
-
+                    
                     <h1 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter font-[Rajdhani]">Access Restricted</h1>
                     <p className="text-slate-400 text-xs font-medium leading-relaxed mb-10 uppercase tracking-widest">
                         Eliezer Hunt is a specialized Telegram Mini App protocol. Please launch via the official Telegram bot to synchronize your extraction node.
                     </p>
-
-                    <a
+                    
+                    <a 
                         href="https://t.me/Obadiah_Bot/eliezer"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -457,7 +323,7 @@ function App() {
                         <Send size={20} />
                         Open in Telegram
                     </a>
-
+                    
                     <p className="mt-8 text-[9px] text-slate-600 font-black uppercase tracking-[0.3em]">
                         Mobile Protocol v5.2 • Secure Connection Only
                     </p>

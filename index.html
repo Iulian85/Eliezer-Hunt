@@ -34,19 +34,6 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#0f172a',
-            secondary: '#1e293b',
-            accent: '#4f46e5',
-          }
-        }
-      }
-    }
-  </script>
 <script type="importmap">
 {
   "imports": {
@@ -74,11 +61,12 @@
   }
 }
 </script>
-<link rel="stylesheet" href="src/index.css">
+<link rel="stylesheet" href="/index.css">
 </head>
 <body>
   <div id="root"></div>
   <!-- Standard Vite module entry point -->
   <script type="module" src="./index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>
